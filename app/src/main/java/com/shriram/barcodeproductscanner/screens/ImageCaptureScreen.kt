@@ -61,6 +61,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -91,6 +92,8 @@ fun ImageCaptureScreen(
     var showConfirmDialog by remember { mutableStateOf(false) }
     var capturedImages by remember { mutableStateOf(listOf<CapturedImage>()) }
     var showDeleteDialog by remember { mutableStateOf<CapturedImage?>(null) }
+
+    var previewView by remember { mutableStateOf<PreviewView?>(null) }
 
     LaunchedEffect(Unit) {
         // Load existing images for this barcode
@@ -238,14 +241,8 @@ fun ImageCaptureScreen(
             // Camera Preview with Captured Images
             Box(
                 modifier = Modifier.fillMaxSize()
+                    .background(Color.Black)
             ) {
-                // Black background for the entire screen
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black)
-                )
-
                 // Main Camera Preview Container
                 Box(
                     modifier = Modifier
@@ -256,7 +253,14 @@ fun ImageCaptureScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth(0.90f) // Take 90% of screen width
-                            .aspectRatio(1f), // Keep it square
+                            .aspectRatio(1f) // Keep it square
+                            .clip(MaterialTheme.shapes.small)
+                            .border(
+                                2.dp,
+                                Color.White.copy(alpha = 0.5f),
+                                MaterialTheme.shapes.small
+                            )
+                            .background(Color.Black),
                         contentAlignment = Alignment.Center
                     ) {
                         // Square camera preview
@@ -267,23 +271,28 @@ fun ImageCaptureScreen(
                                         android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                                         android.view.ViewGroup.LayoutParams.MATCH_PARENT
                                     )
-                                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                                    implementationMode = PreviewView.ImplementationMode.PERFORMANCE
+                                    scaleType = PreviewView.ScaleType.FILL_CENTER
                                 }
                             },
-                            modifier = Modifier.fillMaxSize()
-                        ) { previewView ->
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(MaterialTheme.shapes.small)
+                        ) { view ->
                             val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
                             cameraProviderFuture.addListener({
                                 val cameraProvider = cameraProviderFuture.get()
 
                                 val preview = Preview.Builder()
-                                    .setTargetResolution(android.util.Size(1080, 1080))
+                                    .setTargetResolution(android.util.Size(2000, 2000))
                                     .build()
-                                preview.surfaceProvider = previewView.surfaceProvider
+                                preview.setSurfaceProvider(view.surfaceProvider)
 
                                 imageCapture = ImageCapture.Builder()
                                     .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-                                    .setTargetResolution(android.util.Size(1080, 1080))
+                                    .setTargetResolution(android.util.Size(2000, 2000))
+                                    .setFlashMode(ImageCapture.FLASH_MODE_AUTO)
+                                    .setJpegQuality(100)
                                     .build()
 
                                 try {
@@ -299,19 +308,9 @@ fun ImageCaptureScreen(
                                 }
                             }, ContextCompat.getMainExecutor(context))
                         }
-
-                        // Square overlay border
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .border(
-                                    2.dp,
-                                    Color.White.copy(alpha = 0.5f),
-                                    MaterialTheme.shapes.small
-                                )
-                        )
                     }
                 }
+
 
                 // Bottom Panel with Controls and Images
                 Column(
@@ -349,6 +348,7 @@ fun ImageCaptureScreen(
                                             MaterialTheme.colorScheme.primary,
                                             MaterialTheme.shapes.small
                                         )
+                                        .clip(MaterialTheme.shapes.small)
                                 ) {
                                     AsyncImage(
                                         model = image.uri,
@@ -360,7 +360,7 @@ fun ImageCaptureScreen(
                                         onClick = { showDeleteDialog = image },
                                         modifier = Modifier
                                             .align(Alignment.TopEnd)
-//                                            .size(24.dp)
+                                            .size(24.dp)
                                             .background(
                                                 Color.Black.copy(alpha = 0.7f),
                                                 MaterialTheme.shapes.small
@@ -370,9 +370,7 @@ fun ImageCaptureScreen(
                                             Icons.Default.Delete,
                                             contentDescription = "Delete image",
                                             tint = Color.White,
-                                            modifier = Modifier
-                                                .padding(0.dp)
-                                                .size(16.dp)
+                                            modifier = Modifier.size(16.dp)
                                         )
                                     }
                                 }
@@ -386,7 +384,7 @@ fun ImageCaptureScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-            Text(
+                        Text(
                             text = "${capturedImages.size} images",
                             style = MaterialTheme.typography.titleMedium,
                             color = Color.White
@@ -417,6 +415,11 @@ fun ImageCaptureScreen(
                                             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
                                             contentValues
                                         )
+                                        .setMetadata(
+                                            ImageCapture.Metadata().apply {
+                                                isReversedHorizontal = false
+                                            }
+                                        )
                                         .build()
 
                                     imageCapture.takePicture(
@@ -441,6 +444,11 @@ fun ImageCaptureScreen(
 
                                             override fun onError(exc: ImageCaptureException) {
                                                 Log.e("ImageCapture", "Image capture failed", exc)
+                                                Toast.makeText(
+                                                    context,
+                                                    "Failed to save image: ${exc.message}",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
                                             }
                                         }
                                     )

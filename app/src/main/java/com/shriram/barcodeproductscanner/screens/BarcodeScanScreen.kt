@@ -1,6 +1,7 @@
 package com.shriram.barcodeproductscanner.screens
 
 import android.util.Log
+import android.widget.Toast
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
@@ -159,7 +160,18 @@ fun BarcodeScanScreen(
                             .addOnSuccessListener { barcodes ->
                                 for (barcode in barcodes) {
                                     barcode.rawValue?.let { value ->
-                                        onBarcodeDetected(value)
+                                        // Check if it's a QR code
+                                        if (barcode.format == com.google.mlkit.vision.barcode.common.Barcode.FORMAT_QR_CODE) {
+                                            // Show error message for QR codes
+                                            Toast.makeText(
+                                                context,
+                                                "QR codes are not supported. Please scan a product barcode.",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        } else {
+                                            // Process regular barcodes
+                                            onBarcodeDetected(value)
+                                        }
                                     }
                                 }
                             }
