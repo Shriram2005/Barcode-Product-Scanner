@@ -1,6 +1,7 @@
 package com.shriram.barcodeproductscanner.screens
 
 import android.util.Log
+import android.view.ViewGroup
 import android.widget.Toast
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -41,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -49,7 +51,9 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import com.shriram.barcodeproductscanner.R
 import java.util.concurrent.Executors
 
 @OptIn(ExperimentalPermissionsApi::class)
@@ -96,13 +100,13 @@ fun BarcodeScanScreen(
             )
             Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "Camera Permission Required",
+                text = stringResource(R.string.camera_permission_required),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "We need camera access to scan barcodes",
+                text = stringResource(R.string.camera_permission_description),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -111,7 +115,7 @@ fun BarcodeScanScreen(
                 onClick = { cameraPermissionState.launchPermissionRequest() },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Grant Permission")
+                Text(stringResource(R.string.grant_permission))
             }
         }
         return
@@ -122,9 +126,9 @@ fun BarcodeScanScreen(
         AndroidView(
             factory = { context ->
                 PreviewView(context).apply {
-                    layoutParams = android.view.ViewGroup.LayoutParams(
-                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                        android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
                     )
                     implementationMode = PreviewView.ImplementationMode.COMPATIBLE
                 }
@@ -139,7 +143,7 @@ fun BarcodeScanScreen(
                 val preview = Preview.Builder()
                     .build()
                     .also {
-                        it.setSurfaceProvider(previewView.surfaceProvider)
+                        it.surfaceProvider = previewView.surfaceProvider
                     }
 
                 val imageAnalysis = ImageAnalysis.Builder()
@@ -161,11 +165,11 @@ fun BarcodeScanScreen(
                                 for (barcode in barcodes) {
                                     barcode.rawValue?.let { value ->
                                         // Check if it's a QR code
-                                        if (barcode.format == com.google.mlkit.vision.barcode.common.Barcode.FORMAT_QR_CODE) {
+                                        if (barcode.format == Barcode.FORMAT_QR_CODE) {
                                             // Show error message for QR codes
                                             Toast.makeText(
                                                 context,
-                                                "QR codes are not supported. Please scan a product barcode.",
+                                                context.getString(R.string.qr_not_supported),
                                                 Toast.LENGTH_LONG
                                             ).show()
                                         } else {
@@ -241,13 +245,13 @@ fun BarcodeScanScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Position barcode in frame",
+                text = stringResource(R.string.position_barcode),
                 color = Color.White,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Make sure the barcode is well-lit and in focus",
+                text = stringResource(R.string.barcode_scanning_tip),
                 color = Color.White.copy(alpha = 0.8f),
                 style = MaterialTheme.typography.bodyMedium
             )

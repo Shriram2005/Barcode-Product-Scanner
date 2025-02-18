@@ -66,10 +66,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
+import com.shriram.barcodeproductscanner.R
+import com.shriram.barcodeproductscanner.custom_composable.bounceClick
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -77,6 +80,13 @@ data class CapturedImage(
     val uri: Uri,
     val fileName: String
 )
+
+private fun copyBarcodeToClipboard(context: Context, barcodeNumber: String) {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    val clip = ClipData.newPlainText("Barcode", barcodeNumber)
+    clipboard.setPrimaryClip(clip)
+    Toast.makeText(context, context.getString(R.string.barcode_copied), Toast.LENGTH_SHORT).show()
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -144,18 +154,11 @@ fun ImageCaptureScreen(
             .maxOrNull()?.plus(1) ?: 1
     }
 
-    fun copyBarcodeToClipboard() {
-        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = ClipData.newPlainText("Barcode", barcodeNumber)
-        clipboard.setPrimaryClip(clip)
-        Toast.makeText(context, "Barcode copied to clipboard", Toast.LENGTH_SHORT).show()
-    }
-
     if (showDeleteDialog != null) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = null },
-            title = { Text("Delete Image") },
-            text = { Text("Are you sure you want to delete this image?") },
+            title = { Text(stringResource(R.string.delete_image)) },
+            text = { Text(stringResource(R.string.delete_confirmation)) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -170,12 +173,12 @@ fun ImageCaptureScreen(
                         containerColor = MaterialTheme.colorScheme.error
                     )
                 ) {
-                    Text("Delete")
+                    Text(stringResource(R.string.delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = null }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -184,19 +187,19 @@ fun ImageCaptureScreen(
     if (showConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showConfirmDialog = false },
-            title = { Text("Finish Capturing?") },
-            text = { Text("You have captured ${capturedImages.size} images. Do you want to finish?") },
+            title = { Text(stringResource(R.string.finish_capturing)) },
+            text = { Text(stringResource(R.string.finish_capturing_message, capturedImages.size)) },
             confirmButton = {
                 Button(onClick = {
                     showConfirmDialog = false
                     onNavigateBack()
                 }) {
-                    Text("Yes, Finish")
+                    Text(stringResource(R.string.yes_finish))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showConfirmDialog = false }) {
-                    Text("Continue Capturing")
+                    Text(stringResource(R.string.continue_capturing))
                 }
             }
         )
@@ -207,14 +210,14 @@ fun ImageCaptureScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Product Images")
+                        Text(stringResource(R.string.product_images))
                         Text(
-                            text = "Barcode: $barcodeNumber",
+                            text = stringResource(R.string.barcode_label, barcodeNumber),
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 color = MaterialTheme.colorScheme.primary
                             ),
                             modifier = Modifier
-                                .clickable { copyBarcodeToClipboard() }
+                                .clickable { copyBarcodeToClipboard(context, barcodeNumber) }
                                 .padding(vertical = 4.dp)
                         )
                     }
@@ -227,7 +230,7 @@ fun ImageCaptureScreen(
                             onNavigateBack()
                         }
                     }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cancel))
                     }
                 }
             )
@@ -244,156 +247,160 @@ fun ImageCaptureScreen(
                     .background(Color.Black)
             ) {
                 // Main Camera Preview Container
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.SpaceBetween
                 ) {
                     // Camera Preview Box with fixed size
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(0.90f) // Take 90% of screen width
-                            .aspectRatio(1f) // Keep it square
-                            .clip(MaterialTheme.shapes.small)
-                            .border(
-                                2.dp,
-                                Color.White.copy(alpha = 0.5f),
-                                MaterialTheme.shapes.small
-                            )
-                            .background(Color.Black),
+                            .fillMaxWidth()
+                            .weight(1f),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Square camera preview
-                        AndroidView(
-                            factory = { context ->
-                                PreviewView(context).apply {
-                                    layoutParams = android.view.ViewGroup.LayoutParams(
-                                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                                        android.view.ViewGroup.LayoutParams.MATCH_PARENT
-                                    )
-                                    implementationMode = PreviewView.ImplementationMode.PERFORMANCE
-                                    scaleType = PreviewView.ScaleType.FILL_CENTER
-                                }
-                            },
+                        Box(
                             modifier = Modifier
-                                .fillMaxSize()
+                                .fillMaxWidth(0.95f)
+                                .aspectRatio(1f)
                                 .clip(MaterialTheme.shapes.small)
-                        ) { view ->
-                            val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-                            cameraProviderFuture.addListener({
-                                val cameraProvider = cameraProviderFuture.get()
-
-                                val preview = Preview.Builder()
-                                    .setTargetResolution(android.util.Size(2000, 2000))
-                                    .build()
-                                preview.setSurfaceProvider(view.surfaceProvider)
-
-                                imageCapture = ImageCapture.Builder()
-                                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-                                    .setTargetResolution(android.util.Size(2000, 2000))
-                                    .setFlashMode(ImageCapture.FLASH_MODE_AUTO)
-                                    .setJpegQuality(100)
-                                    .build()
-
-                                try {
-                                    cameraProvider.unbindAll()
-                                    cameraProvider.bindToLifecycle(
-                                        lifecycleOwner,
-                                        CameraSelector.DEFAULT_BACK_CAMERA,
-                                        preview,
-                                        imageCapture
-                                    )
-                                } catch (e: Exception) {
-                                    Log.e("ImageCaptureScreen", "Use case binding failed", e)
-                                }
-                            }, ContextCompat.getMainExecutor(context))
-                        }
-                    }
-                }
-
-
-                // Bottom Panel with Controls and Images
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .background(
-                            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    Color.Black.copy(alpha = 0.8f)
-                                ),
-                                startY = 0f,
-                                endY = 300f
-                            )
-                        )
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Captured Images Horizontal List
-                    if (capturedImages.isNotEmpty()) {
-                        androidx.compose.foundation.lazy.LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth()
+                                .border(
+                                    2.dp,
+                                    Color.White.copy(alpha = 0.5f),
+                                    MaterialTheme.shapes.small
+                                )
+                                .background(Color.Black),
+                            contentAlignment = Alignment.Center
                         ) {
-                            items(
-                                items = capturedImages,
-                                key = { it.uri.toString() }
-                            ) { image ->
-                                Box(
-                                    modifier = Modifier
-                                        .size(80.dp)
-                                        .border(
-                                            1.dp,
-                                            MaterialTheme.colorScheme.primary,
-                                            MaterialTheme.shapes.small
+                            // Square camera preview
+                            AndroidView(
+                                factory = { context ->
+                                    PreviewView(context).apply {
+                                        layoutParams = android.view.ViewGroup.LayoutParams(
+                                            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                                            android.view.ViewGroup.LayoutParams.MATCH_PARENT
                                         )
-                                        .clip(MaterialTheme.shapes.small)
-                                ) {
-                                    AsyncImage(
-                                        model = image.uri,
-                                        contentDescription = "Captured image",
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                    IconButton(
-                                        onClick = { showDeleteDialog = image },
-                                        modifier = Modifier
-                                            .align(Alignment.TopEnd)
-                                            .size(24.dp)
-                                            .background(
-                                                Color.Black.copy(alpha = 0.7f),
-                                                MaterialTheme.shapes.small
-                                            )
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Delete,
-                                            contentDescription = "Delete image",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(16.dp)
-                                        )
+                                        implementationMode = PreviewView.ImplementationMode.PERFORMANCE
+                                        scaleType = PreviewView.ScaleType.FILL_CENTER
                                     }
-                                }
+                                },
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(MaterialTheme.shapes.small)
+                            ) { view ->
+                                val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+                                cameraProviderFuture.addListener({
+                                    val cameraProvider = cameraProviderFuture.get()
+
+                                    val preview = Preview.Builder()
+                                        .setTargetResolution(android.util.Size(2000, 2000))
+                                        .build()
+                                    preview.surfaceProvider = view.surfaceProvider
+
+                                    imageCapture = ImageCapture.Builder()
+                                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                                        .setTargetResolution(android.util.Size(2000, 2000))
+                                        .setFlashMode(ImageCapture.FLASH_MODE_AUTO)
+                                        .setJpegQuality(100)
+                                        .build()
+
+                                    try {
+                                        cameraProvider.unbindAll()
+                                        cameraProvider.bindToLifecycle(
+                                            lifecycleOwner,
+                                            CameraSelector.DEFAULT_BACK_CAMERA,
+                                            preview,
+                                            imageCapture
+                                        )
+                                    } catch (e: Exception) {
+                                        Log.e("ImageCaptureScreen", "Use case binding failed", e)
+                                    }
+                                }, ContextCompat.getMainExecutor(context))
                             }
                         }
                     }
 
-                    // Camera Controls
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    // Bottom Panel with Controls and Images
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        Color.Black.copy(alpha = 0.8f)
+                                    ),
+                                    startY = 0f,
+                                    endY = 100f
+                                )
+                            )
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text(
-                            text = "${capturedImages.size} images",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.White
-                        )
+                        // Captured Images Horizontal List
+                        if (capturedImages.isNotEmpty()) {
+                            androidx.compose.foundation.lazy.LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                items(
+                                    items = capturedImages,
+                                    key = { it.uri.toString() }
+                                ) { image ->
+                                    Box(
+                                        modifier = Modifier
+                                            .size(80.dp)
+                                            .border(
+                                                1.dp,
+                                                MaterialTheme.colorScheme.primary,
+                                                MaterialTheme.shapes.small
+                                            )
+                                            .clip(MaterialTheme.shapes.small)
+                                    ) {
+                                        AsyncImage(
+                                            model = image.uri,
+                                            contentDescription = "Captured image",
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                        IconButton(
+                                            onClick = { showDeleteDialog = image },
+                                            modifier = Modifier
+                                                .bounceClick()
+                                                .align(Alignment.TopEnd)
+                                                .size(32.dp)
+                                                .background(
+                                                    Color.Black.copy(alpha = 0.4f),
+                                                    shape =  MaterialTheme.shapes.small
+                                                )
+                                                .padding(8.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Delete,
+                                                contentDescription = "Delete image",
+                                                tint = Color.White,
+                                                modifier = Modifier.fillMaxSize()
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
 
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        // Camera Controls
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
                         ) {
+                            // Image count on the left
+                            Text(
+                                text = stringResource(R.string.images_count, capturedImages.size),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = Color.White,
+                                modifier = Modifier.align(Alignment.CenterStart)
+                            )
+
+                            // Center the camera button
                             FloatingActionButton(
                                 onClick = {
                                     val imageCapture = imageCapture ?: return@FloatingActionButton
@@ -446,7 +453,7 @@ fun ImageCaptureScreen(
                                                 Log.e("ImageCapture", "Image capture failed", exc)
                                                 Toast.makeText(
                                                     context,
-                                                    "Failed to save image: ${exc.message}",
+                                                    context.getString(R.string.image_save_failed, exc.message),
                                                     Toast.LENGTH_SHORT
                                                 ).show()
                                             }
@@ -454,25 +461,36 @@ fun ImageCaptureScreen(
                                     )
                                 },
                                 containerColor = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(64.dp)
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .align(Alignment.Center)
+                                    .bounceClick()
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Camera,
-                                    contentDescription = "Take photo",
+                                    contentDescription = stringResource(R.string.take_photo),
                                     tint = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(32.dp)
+                                    modifier = Modifier.size(36.dp)
                                 )
                             }
 
+                            // Finish button on the right
                             if (capturedImages.isNotEmpty()) {
                                 Button(
                                     onClick = { showConfirmDialog = true },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                         contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                                    )
+                                    ),
+                                    modifier = Modifier
+                                        .align(Alignment.CenterEnd)
+                                        .padding(start = 16.dp)
+                                        .bounceClick()
                                 ) {
-                                    Text("Finish")
+                                    Text(
+                                        text = stringResource(R.string.finish),
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
                                 }
                             }
                         }
@@ -499,7 +517,7 @@ fun ImageCaptureScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(Icons.Default.CheckCircle, contentDescription = null)
-                            Text("Image saved successfully!")
+                            Text(stringResource(R.string.image_saved))
                         }
                     }
                 }
