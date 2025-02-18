@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Сканер штрих-кодов товаров</string>
+    
+    <!-- Barcode Scanner Screen -->
+    <string name="camera_permission_required">Требуется разрешение камеры</string>
+    <string name="camera_permission_description">Нам нужен доступ к камере для сканирования штрих-кодов</string>
+    <string name="grant_permission">Предоставить разрешение</string>
+    <string name="position_barcode">Расположите штрих-код в рамке</string>
+    <string name="barcode_scanning_tip">Убедитесь, что штрих-код хорошо освещен и в фокусе</string>
+    <string name="qr_not_supported">QR-коды не поддерживаются. Пожалуйста, отсканируйте штрих-код товара.</string>
+
+    <!-- Image Capture Screen -->
+    <string name="product_images">Изображения товара</string>
+    <string name="barcode_label">Штрих-код: %s</string>
+    <string name="barcode_copied">Штрих-код скопирован в буфер обмена</string>
+    <string name="images_count">%d изображений</string>
+    <string name="take_photo">Сделать фото</string>
+    <string name="finish">Завершить</string>
+    <string name="delete_image">Удалить изображение</string>
+    <string name="delete_confirmation">Вы уверены, что хотите удалить это изображение?</string>
+    <string name="delete">Удалить</string>
+    <string name="cancel">Отмена</string>
+    <string name="finish_capturing">Завершить съемку?</string>
+    <string name="finish_capturing_message">Вы сделали %d изображений. Хотите завершить?</string>
+    <string name="yes_finish">Да, завершить</string>
+    <string name="continue_capturing">Продолжить съемку</string>
+    <string name="image_saved">Изображение сохранено успешно!</string>
+    <string name="image_save_failed">Не удалось сохранить изображение: %s</string>
+</resources> 
