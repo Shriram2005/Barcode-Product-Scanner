@@ -8,14 +8,9 @@ import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
-import android.util.Log
 import android.widget.Toast
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageCapture
-import androidx.camera.core.ImageCaptureException
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -33,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -62,14 +58,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush.Companion.verticalGradient
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.shriram.barcodeproductscanner.R
 import com.shriram.barcodeproductscanner.custom_composable.bounceClick
@@ -95,15 +89,13 @@ fun ImageCaptureScreen(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    var imageCapture: ImageCapture? by remember { mutableStateOf(null) }
     var showSuccessMessage by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     var showConfirmDialog by remember { mutableStateOf(false) }
     var capturedImages by remember { mutableStateOf(listOf<CapturedImage>()) }
     var showDeleteDialog by remember { mutableStateOf<CapturedImage?>(null) }
-
-    var previewView by remember { mutableStateOf<PreviewView?>(null) }
+    var tempImageUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedImage by remember { mutableStateOf<CapturedImage?>(null) }
 
     LaunchedEffect(Unit) {
         // Load existing images for this barcode
@@ -146,12 +138,34 @@ fun ImageCaptureScreen(
 
         return capturedImages
             .mapNotNull { image ->
-                // Extract number from filename (e.g., "barcode-1.jpg" -> 1)
                 val numberStr = image.fileName.substringAfterLast("-")
                     .substringBefore(".")
                 numberStr.toIntOrNull()
             }
             .maxOrNull()?.plus(1) ?: 1
+    }
+
+    // Camera launcher
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && tempImageUri != null) {
+            val fileName = "$barcodeNumber-${getNextImageNumber()}.jpg"
+            capturedImages = (capturedImages + CapturedImage(tempImageUri!!, fileName))
+                .sortedBy { it.fileName }
+            scope.launch {
+                showSuccessMessage = true
+                delay(2000)
+                showSuccessMessage = false
+            }
+        } else {
+            Toast.makeText(
+                context,
+                context.getString(R.string.image_save_failed, "Camera returned no image"),
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+        tempImageUri = null
     }
 
     if (showDeleteDialog != null) {
@@ -230,7 +244,10 @@ fun ImageCaptureScreen(
                             onNavigateBack()
                         }
                     }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cancel))
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.cancel)
+                        )
                     }
                 }
             )
@@ -241,17 +258,18 @@ fun ImageCaptureScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Camera Preview with Captured Images
+            // Main Container
             Box(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
                     .background(Color.Black)
             ) {
-                // Main Camera Preview Container
+                // Main Content Container
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Camera Preview Box with fixed size
+                    // Preview Box with fixed size
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -271,50 +289,28 @@ fun ImageCaptureScreen(
                                 .background(Color.Black),
                             contentAlignment = Alignment.Center
                         ) {
-                            // Square camera preview
-                            AndroidView(
-                                factory = { context ->
-                                    PreviewView(context).apply {
-                                        layoutParams = android.view.ViewGroup.LayoutParams(
-                                            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                                            android.view.ViewGroup.LayoutParams.MATCH_PARENT
-                                        )
-                                        implementationMode = PreviewView.ImplementationMode.PERFORMANCE
-                                        scaleType = PreviewView.ScaleType.FILL_CENTER
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(MaterialTheme.shapes.small)
-                            ) { view ->
-                                val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-                                cameraProviderFuture.addListener({
-                                    val cameraProvider = cameraProviderFuture.get()
-
-                                    val preview = Preview.Builder()
-                                        .setTargetResolution(android.util.Size(2000, 2000))
-                                        .build()
-                                    preview.surfaceProvider = view.surfaceProvider
-
-                                    imageCapture = ImageCapture.Builder()
-                                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-                                        .setTargetResolution(android.util.Size(2000, 2000))
-                                        .setFlashMode(ImageCapture.FLASH_MODE_AUTO)
-                                        .setJpegQuality(100)
-                                        .build()
-
-                                    try {
-                                        cameraProvider.unbindAll()
-                                        cameraProvider.bindToLifecycle(
-                                            lifecycleOwner,
-                                            CameraSelector.DEFAULT_BACK_CAMERA,
-                                            preview,
-                                            imageCapture
-                                        )
-                                    } catch (e: Exception) {
-                                        Log.e("ImageCaptureScreen", "Use case binding failed", e)
-                                    }
-                                }, ContextCompat.getMainExecutor(context))
+                            // Show selected image, latest image, or placeholder
+                            if (selectedImage != null) {
+                                AsyncImage(
+                                    model = selectedImage!!.uri,
+                                    contentDescription = "Selected image",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else if (capturedImages.isNotEmpty()) {
+                                AsyncImage(
+                                    model = capturedImages.last().uri,
+                                    contentDescription = "Latest captured image",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Camera,
+                                    contentDescription = null,
+                                    tint = Color.White.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(64.dp)
+                                )
                             }
                         }
                     }
@@ -324,7 +320,7 @@ fun ImageCaptureScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(
-                                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                brush = verticalGradient(
                                     colors = listOf(
                                         Color.Transparent,
                                         Color.Black.copy(alpha = 0.8f)
@@ -338,7 +334,7 @@ fun ImageCaptureScreen(
                     ) {
                         // Captured Images Horizontal List
                         if (capturedImages.isNotEmpty()) {
-                            androidx.compose.foundation.lazy.LazyRow(
+                            LazyRow(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
@@ -351,10 +347,16 @@ fun ImageCaptureScreen(
                                             .size(80.dp)
                                             .border(
                                                 1.dp,
-                                                MaterialTheme.colorScheme.primary,
+                                                if (selectedImage?.uri == image.uri)
+                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                                                else MaterialTheme.colorScheme.primary,
                                                 MaterialTheme.shapes.small
                                             )
                                             .clip(MaterialTheme.shapes.small)
+                                            .clickable {
+                                                selectedImage =
+                                                    if (selectedImage?.uri == image.uri) null else image
+                                            }
                                     ) {
                                         AsyncImage(
                                             model = image.uri,
@@ -367,12 +369,12 @@ fun ImageCaptureScreen(
                                             modifier = Modifier
                                                 .bounceClick()
                                                 .align(Alignment.TopEnd)
-                                                .size(32.dp)
+                                                .size(24.dp)
                                                 .background(
                                                     Color.Black.copy(alpha = 0.4f),
-                                                    shape =  MaterialTheme.shapes.small
+                                                    shape = MaterialTheme.shapes.small
                                                 )
-                                                .padding(8.dp)
+                                                .padding(4.dp)
                                         ) {
                                             Icon(
                                                 Icons.Default.Delete,
@@ -403,7 +405,6 @@ fun ImageCaptureScreen(
                             // Center the camera button
                             FloatingActionButton(
                                 onClick = {
-                                    val imageCapture = imageCapture ?: return@FloatingActionButton
                                     val nextNumber = getNextImageNumber()
                                     val fileName = "$barcodeNumber-$nextNumber.jpg"
 
@@ -416,49 +417,14 @@ fun ImageCaptureScreen(
                                         )
                                     }
 
-                                    val outputOptions = ImageCapture.OutputFileOptions
-                                        .Builder(
-                                            context.contentResolver,
-                                            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                                            contentValues
-                                        )
-                                        .setMetadata(
-                                            ImageCapture.Metadata().apply {
-                                                isReversedHorizontal = false
-                                            }
-                                        )
-                                        .build()
-
-                                    imageCapture.takePicture(
-                                        outputOptions,
-                                        ContextCompat.getMainExecutor(context),
-                                        object : ImageCapture.OnImageSavedCallback {
-                                            override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                                                output.savedUri?.let { uri ->
-                                                    capturedImages =
-                                                        (capturedImages + CapturedImage(
-                                                            uri,
-                                                            fileName
-                                                        ))
-                                                            .sortedBy { it.fileName }
-                                                }
-                                                scope.launch {
-                                                    showSuccessMessage = true
-                                                    delay(2000)
-                                                    showSuccessMessage = false
-                                                }
-                                            }
-
-                                            override fun onError(exc: ImageCaptureException) {
-                                                Log.e("ImageCapture", "Image capture failed", exc)
-                                                Toast.makeText(
-                                                    context,
-                                                    context.getString(R.string.image_save_failed, exc.message),
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                            }
-                                        }
+                                    tempImageUri = context.contentResolver.insert(
+                                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                                        contentValues
                                     )
+
+                                    tempImageUri?.let { uri ->
+                                        cameraLauncher.launch(uri)
+                                    }
                                 },
                                 containerColor = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier
@@ -502,8 +468,8 @@ fun ImageCaptureScreen(
                     visible = showSuccessMessage,
                     enter = fadeIn() + slideInVertically(),
                     exit = fadeOut() + slideOutVertically(),
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
                         .padding(top = 16.dp)
                 ) {
                     Surface(
@@ -526,7 +492,6 @@ fun ImageCaptureScreen(
     }
 }
 
-
 @androidx.compose.ui.tooling.preview.Preview
 @Composable
 private fun ImageCaptureScreenPreview() {
@@ -534,4 +499,4 @@ private fun ImageCaptureScreenPreview() {
         barcodeNumber = "1234567890",
         onNavigateBack = {}
     )
-}
+} 
