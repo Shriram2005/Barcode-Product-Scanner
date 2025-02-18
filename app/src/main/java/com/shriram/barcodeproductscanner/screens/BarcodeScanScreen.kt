@@ -225,7 +225,7 @@ fun BarcodeScanScreen(
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
                 .background(Color.Black.copy(alpha = 0.3f))
-                .padding(16.dp),
+                .padding(top = 32.dp, bottom = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(

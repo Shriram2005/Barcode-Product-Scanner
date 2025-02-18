@@ -26,7 +26,11 @@ fun AppNavigation(
         composable(Screen.BarcodeScanner.route) {
             BarcodeScanScreen(
                 onBarcodeDetected = { barcodeNumber ->
-                    navController.navigate(Screen.ImageCapture.createRoute(barcodeNumber))
+                    navController.navigate(Screen.ImageCapture.createRoute(barcodeNumber)) {
+                        popUpTo(Screen.BarcodeScanner.route) {
+                            saveState = true
+                        }
+                    }
                 }
             )
         }
@@ -38,7 +42,11 @@ fun AppNavigation(
             ImageCaptureScreen(
                 barcodeNumber = barcodeNumber,
                 onNavigateBack = {
-                    navController.navigateUp()
+                    navController.navigate(Screen.BarcodeScanner.route) {
+                        popUpTo(Screen.BarcodeScanner.route) {
+                            inclusive = true
+                        }
+                    }
                 }
             )
         }
