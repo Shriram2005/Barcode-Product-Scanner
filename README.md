@@ -9,6 +9,15 @@ The Barcode Product Scanner is a Kotlin-based application designed to streamline
 - **Automated File Naming**: The application automatically names the captured images in the format `[barcodeNo-1]`, `[barcodeNo-2]`, etc., ensuring consistency and ease of identification.
 - **Local Storage**: All images are saved in a dedicated folder on your device, making them easily accessible for upload.
 
+## Screenshots
+
+<img src="https://github.com/user-attachments/assets/59287de0-8653-46ec-a239-668b00e3add0" height="400">
+<img src="https://github.com/user-attachments/assets/d9ea9549-b4fe-46be-8900-a9b5266b36a4" height="400">
+<img src="https://github.com/user-attachments/assets/3f674d24-49de-4726-8b5e-db1a68bc0d9f" height="400">
+<img src="https://github.com/user-attachments/assets/06b584ed-c54e-4d72-9281-911efb681765" height="400">
+<img src="https://github.com/user-attachments/assets/3e7b5674-a39a-4b6a-93f3-29f1e6c616d1" height="400">
+
+
 ## How It Works
 1. **Scan the Barcode**: Use the app to scan the barcode of the product. The barcode number is retrieved and used as the base name for the images.
 2. **Capture Images**: Capture multiple images of the product. The app will automatically name and save each image in the format `[barcodeNo-1]`, `[barcodeNo-2]`, etc.
