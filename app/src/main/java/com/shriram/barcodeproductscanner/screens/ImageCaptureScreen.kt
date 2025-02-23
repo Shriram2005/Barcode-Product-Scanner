@@ -89,12 +89,15 @@ fun ImageCaptureScreen(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
         viewModel.handleImageCaptureResult(success, context)
-        if (!success) {
-            Toast.makeText(
-                context,
-                context.getString(R.string.image_save_failed, "Camera returned no image"),
-                Toast.LENGTH_SHORT
-            ).show()
+    }
+
+    // Auto-launch camera when there are no images
+    LaunchedEffect(uiState.shouldLaunchCamera) {
+        if (uiState.shouldLaunchCamera) {
+            viewModel.prepareImageCapture(context)?.let { uri ->
+                cameraLauncher.launch(uri)
+                viewModel.clearShouldLaunchCamera()
+            }
         }
     }
 

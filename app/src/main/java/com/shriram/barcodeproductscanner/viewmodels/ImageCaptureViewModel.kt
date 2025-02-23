@@ -27,7 +27,8 @@ data class ImageCaptureUiState(
     val showSuccessMessage: Boolean = false,
     val showConfirmDialog: Boolean = false,
     val showDeleteDialog: CapturedImage? = null,
-    val tempImageUri: Uri? = null
+    val tempImageUri: Uri? = null,
+    val shouldLaunchCamera: Boolean = false
 )
 
 class ImageCaptureViewModel : ViewModel() {
@@ -69,7 +70,13 @@ class ImageCaptureViewModel : ViewModel() {
                     )
                     images.add(CapturedImage(contentUri, displayName))
                 }
-                _uiState.update { it.copy(capturedImages = images.sortedBy { img -> img.fileName }) }
+                val sortedImages = images.sortedBy { img -> img.fileName }
+                _uiState.update { 
+                    it.copy(
+                        capturedImages = sortedImages,
+                        shouldLaunchCamera = sortedImages.isEmpty()
+                    )
+                }
             }
         }
     }
@@ -112,20 +119,26 @@ class ImageCaptureViewModel : ViewModel() {
         if (success && _uiState.value.tempImageUri != null) {
             val fileName = "${_uiState.value.barcodeNumber}-${getNextImageNumber()}.jpg"
             val newImage = CapturedImage(_uiState.value.tempImageUri!!, fileName)
-
+            
             _uiState.update { state ->
                 state.copy(
-                    capturedImages = (state.capturedImages + newImage).sortedBy { it.fileName },
                     showSuccessMessage = true,
                     tempImageUri = null
                 )
             }
+
+            // Reload images after capture
+            loadExistingImages(context)
 
             viewModelScope.launch {
                 delay(2000)
                 _uiState.update { it.copy(showSuccessMessage = false) }
             }
         } else {
+            // Delete the temporary file if capture failed or was cancelled
+            _uiState.value.tempImageUri?.let { uri ->
+                context.contentResolver.delete(uri, null, null)
+            }
             _uiState.update { it.copy(tempImageUri = null) }
         }
     }
@@ -164,5 +177,9 @@ class ImageCaptureViewModel : ViewModel() {
 
     fun hideConfirmDialog() {
         _uiState.update { it.copy(showConfirmDialog = false) }
+    }
+
+    fun clearShouldLaunchCamera() {
+        _uiState.update { it.copy(shouldLaunchCamera = false) }
     }
 } 
