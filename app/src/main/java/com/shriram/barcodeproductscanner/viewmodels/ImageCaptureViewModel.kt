@@ -120,17 +120,20 @@ class ImageCaptureViewModel : ViewModel() {
             val fileName = "${_uiState.value.barcodeNumber}-${getNextImageNumber()}.jpg"
             val newImage = CapturedImage(_uiState.value.tempImageUri!!, fileName)
             
+            // First update the capturedImages list
             _uiState.update { state ->
                 state.copy(
+                    capturedImages = (state.capturedImages + newImage).sortedBy { it.fileName },
                     showSuccessMessage = true,
                     tempImageUri = null
                 )
             }
 
-            // Reload images after capture
-            loadExistingImages(context)
-
+            // Then reload images to ensure we have the correct URIs
             viewModelScope.launch {
+                delay(500) // Small delay to ensure the file is properly saved
+                loadExistingImages(context)
+                
                 delay(2000)
                 _uiState.update { it.copy(showSuccessMessage = false) }
             }
