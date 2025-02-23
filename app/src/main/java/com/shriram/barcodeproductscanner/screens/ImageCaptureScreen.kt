@@ -80,7 +80,7 @@ fun ImageCaptureScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(barcodeNumber) {
-        viewModel.initialize(barcodeNumber)
+        viewModel.initialize(barcodeNumber, context)
         viewModel.loadExistingImages(context)
     }
 

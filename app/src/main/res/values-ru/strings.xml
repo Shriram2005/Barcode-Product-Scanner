@@ -6,7 +6,7 @@
     <string name="camera_permission_required">Требуется разрешение камеры</string>
     <string name="camera_permission_description">Нам нужен доступ к камере для сканирования штрих-кодов</string>
     <string name="grant_permission">Предоставить разрешение</string>
-    <string name="position_barcode">Расположите штрих-код в рамке</string>
+    <string name="position_barcode">Поместите штрих-код в рамку</string>
     <string name="barcode_scanning_tip">Убедитесь, что штрих-код хорошо освещен и в фокусе</string>
     <string name="qr_not_supported">QR-коды не поддерживаются. Пожалуйста, отсканируйте штрих-код товара.</string>
 
@@ -25,6 +25,21 @@
     <string name="finish_capturing_message">Вы сделали %d изображений. Хотите завершить?</string>
     <string name="yes_finish">Да, завершить</string>
     <string name="continue_capturing">Продолжить съемку</string>
-    <string name="image_saved">Изображение сохранено успешно!</string>
+    <string name="image_saved">Изображение успешно сохранено!</string>
     <string name="image_save_failed">Не удалось сохранить изображение: %s</string>
+
+    <!-- Settings Screen -->
+    <string name="settings">Настройки</string>
+    <string name="back">Назад</string>
+    <string name="save">Сохранить</string>
+    <string name="settings_saved">Настройки успешно сохранены</string>
+    <string name="image_naming_format">Формат именования изображений</string>
+    <string name="preview">Предпросмотр</string>
+    <string name="include_barcode">Включить штрих-код</string>
+    <string name="include_product_name">Включить название товара</string>
+    <string name="include_date_time">Включить дату и время</string>
+    <string name="include_custom_text">Включить пользовательский текст</string>
+    <string name="product_name">Название товара</string>
+    <string name="custom_text">Пользовательский текст</string>
+    <string name="separator">Разделитель</string>
 </resources> 

@@ -27,4 +27,19 @@
     <string name="continue_capturing">Continue Capturing</string>
     <string name="image_saved">Image saved successfully!</string>
     <string name="image_save_failed">Failed to save image: %s</string>
+
+    <!-- Settings Screen -->
+    <string name="settings">Settings</string>
+    <string name="back">Back</string>
+    <string name="save">Save</string>
+    <string name="settings_saved">Settings saved successfully</string>
+    <string name="image_naming_format">Image Naming Format</string>
+    <string name="preview">Preview</string>
+    <string name="include_barcode">Include Barcode</string>
+    <string name="include_product_name">Include Product Name</string>
+    <string name="include_date_time">Include Date &amp; Time</string>
+    <string name="include_custom_text">Include Custom Text</string>
+    <string name="product_name">Product Name</string>
+    <string name="custom_text">Custom Text</string>
+    <string name="separator">Separator</string>
 </resources>

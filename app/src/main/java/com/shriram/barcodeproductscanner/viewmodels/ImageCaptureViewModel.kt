@@ -34,9 +34,12 @@ data class ImageCaptureUiState(
 class ImageCaptureViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(ImageCaptureUiState())
     val uiState: StateFlow<ImageCaptureUiState> = _uiState.asStateFlow()
+    private val settingsViewModel: SettingsViewModel = SettingsViewModel()
 
-    fun initialize(barcodeNumber: String) {
+    fun initialize(barcodeNumber: String, context: Context) {
         _uiState.update { it.copy(barcodeNumber = barcodeNumber) }
+        // Load settings when initializing
+        settingsViewModel.loadSettings(context)
     }
 
     fun loadExistingImages(context: Context) {
@@ -96,7 +99,7 @@ class ImageCaptureViewModel : ViewModel() {
 
     fun prepareImageCapture(context: Context): Uri? {
         val nextNumber = getNextImageNumber()
-        val fileName = "${_uiState.value.barcodeNumber}-$nextNumber.jpg"
+        val fileName = settingsViewModel.generateImageName(_uiState.value.barcodeNumber) + "-$nextNumber.jpg"
 
         val contentValues = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
@@ -117,7 +120,8 @@ class ImageCaptureViewModel : ViewModel() {
 
     fun handleImageCaptureResult(success: Boolean, context: Context) {
         if (success && _uiState.value.tempImageUri != null) {
-            val fileName = "${_uiState.value.barcodeNumber}-${getNextImageNumber()}.jpg"
+            val nextNumber = getNextImageNumber()
+            val fileName = settingsViewModel.generateImageName(_uiState.value.barcodeNumber) + "-$nextNumber.jpg"
             val newImage = CapturedImage(_uiState.value.tempImageUri!!, fileName)
             
             // First update the capturedImages list
@@ -131,8 +135,8 @@ class ImageCaptureViewModel : ViewModel() {
 
             // Then reload images to ensure we have the correct URIs
             viewModelScope.launch {
-                delay(500) // Small delay to ensure the file is properly saved
-                loadExistingImages(context)
+//                delay(500) // Small delay to ensure the file is properly saved
+//                loadExistingImages(context)
                 
                 delay(2000)
                 _uiState.update { it.copy(showSuccessMessage = false) }

@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    kotlin("plugin.serialization") version "1.9.0"
 }
 
 android {
@@ -74,4 +75,6 @@ dependencies {
     implementation (libs.coil.compose.v222)    // Coil for image loading
     implementation(libs.androidx.lifecycle.viewmodel.compose)     // ViewModel dependency
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.kotlinx.serialization.json)
 }

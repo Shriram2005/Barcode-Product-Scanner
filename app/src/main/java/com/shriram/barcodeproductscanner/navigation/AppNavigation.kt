@@ -7,12 +7,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.shriram.barcodeproductscanner.screens.BarcodeScanScreen
 import com.shriram.barcodeproductscanner.screens.ImageCaptureScreen
+import com.shriram.barcodeproductscanner.screens.SettingsScreen
 
 sealed class Screen(val route: String) {
     data object BarcodeScanner : Screen("barcode_scanner")
     data object ImageCapture : Screen("image_capture/{barcodeNumber}") {
         fun createRoute(barcodeNumber: String) = "image_capture/$barcodeNumber"
     }
+    data object Settings : Screen("settings")
 }
 
 @Composable
@@ -31,6 +33,9 @@ fun AppNavigation(
                             saveState = true
                         }
                     }
+                },
+                onSettingsClick = {
+                    navController.navigate(Screen.Settings.route)
                 }
             )
         }
@@ -47,6 +52,14 @@ fun AppNavigation(
                             inclusive = true
                         }
                     }
+                }
+            )
+        }
+
+        composable(Screen.Settings.route) {
+            SettingsScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
                 }
             )
         }
