@@ -2,12 +2,7 @@ package com.shriram.barcodeproductscanner.screens
 
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.ContentUris
-import android.content.ContentValues
 import android.content.Context
-import android.net.Uri
-import android.os.Environment
-import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -50,11 +45,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,16 +56,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.shriram.barcodeproductscanner.R
 import com.shriram.barcodeproductscanner.custom_composable.bounceClick
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-
-data class CapturedImage(
-    val uri: Uri,
-    val fileName: String
-)
+import com.shriram.barcodeproductscanner.viewmodels.ImageCaptureViewModel
 
 private fun copyBarcodeToClipboard(context: Context, barcodeNumber: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -86,102 +73,40 @@ private fun copyBarcodeToClipboard(context: Context, barcodeNumber: String) {
 @Composable
 fun ImageCaptureScreen(
     barcodeNumber: String,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    viewModel: ImageCaptureViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    var showSuccessMessage by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    var showConfirmDialog by remember { mutableStateOf(false) }
-    var capturedImages by remember { mutableStateOf(listOf<CapturedImage>()) }
-    var showDeleteDialog by remember { mutableStateOf<CapturedImage?>(null) }
-    var tempImageUri by remember { mutableStateOf<Uri?>(null) }
-    var selectedImage by remember { mutableStateOf<CapturedImage?>(null) }
+    val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(Unit) {
-        // Load existing images for this barcode
-        val projection = arrayOf(
-            MediaStore.Images.Media._ID,
-            MediaStore.Images.Media.DISPLAY_NAME
-        )
-        val selection = "${MediaStore.Images.Media.DISPLAY_NAME} LIKE ?"
-        val selectionArgs = arrayOf("$barcodeNumber-%")
-        val sortOrder = "${MediaStore.Images.Media.DISPLAY_NAME} ASC"
-
-        context.contentResolver.query(
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-            projection,
-            selection,
-            selectionArgs,
-            sortOrder
-        )?.use { cursor ->
-            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-            val displayNameColumn =
-                cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
-
-            val images = mutableListOf<CapturedImage>()
-            while (cursor.moveToNext()) {
-                val id = cursor.getLong(idColumn)
-                val displayName = cursor.getString(displayNameColumn)
-                val contentUri = ContentUris.withAppendedId(
-                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                    id
-                )
-                images.add(CapturedImage(contentUri, displayName))
-            }
-            capturedImages = images.sortedBy { it.fileName }
-        }
-    }
-
-    // Function to get the next image number
-    fun getNextImageNumber(): Int {
-        if (capturedImages.isEmpty()) return 1
-
-        return capturedImages
-            .mapNotNull { image ->
-                val numberStr = image.fileName.substringAfterLast("-")
-                    .substringBefore(".")
-                numberStr.toIntOrNull()
-            }
-            .maxOrNull()?.plus(1) ?: 1
+    LaunchedEffect(barcodeNumber) {
+        viewModel.initialize(barcodeNumber)
+        viewModel.loadExistingImages(context)
     }
 
     // Camera launcher
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
-        if (success && tempImageUri != null) {
-            val fileName = "$barcodeNumber-${getNextImageNumber()}.jpg"
-            capturedImages = (capturedImages + CapturedImage(tempImageUri!!, fileName))
-                .sortedBy { it.fileName }
-            scope.launch {
-                showSuccessMessage = true
-                delay(2000)
-                showSuccessMessage = false
-            }
-        } else {
+        viewModel.handleImageCaptureResult(success, context)
+        if (!success) {
             Toast.makeText(
                 context,
                 context.getString(R.string.image_save_failed, "Camera returned no image"),
                 Toast.LENGTH_SHORT
             ).show()
         }
-        tempImageUri = null
     }
 
-    if (showDeleteDialog != null) {
+    if (uiState.showDeleteDialog != null) {
         AlertDialog(
-            onDismissRequest = { showDeleteDialog = null },
+            onDismissRequest = { viewModel.hideDeleteDialog() },
             title = { Text(stringResource(R.string.delete_image)) },
             text = { Text(stringResource(R.string.delete_confirmation)) },
             confirmButton = {
                 Button(
                     onClick = {
-                        val imageToDelete = showDeleteDialog
-                        if (imageToDelete != null) {
-                            context.contentResolver.delete(imageToDelete.uri, null, null)
-                            capturedImages = capturedImages.filter { it != imageToDelete }
-                        }
-                        showDeleteDialog = null
+                        viewModel.deleteImage(context)
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error
@@ -191,28 +116,28 @@ fun ImageCaptureScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = null }) {
+                TextButton(onClick = { viewModel.hideDeleteDialog() }) {
                     Text(stringResource(R.string.cancel))
                 }
             }
         )
     }
 
-    if (showConfirmDialog) {
+    if (uiState.showConfirmDialog) {
         AlertDialog(
-            onDismissRequest = { showConfirmDialog = false },
+            onDismissRequest = { viewModel.hideConfirmDialog() },
             title = { Text(stringResource(R.string.finish_capturing)) },
-            text = { Text(stringResource(R.string.finish_capturing_message, capturedImages.size)) },
+            text = { Text(stringResource(R.string.finish_capturing_message, uiState.capturedImages.size)) },
             confirmButton = {
                 Button(onClick = {
-                    showConfirmDialog = false
+                    viewModel.hideConfirmDialog()
                     onNavigateBack()
                 }) {
                     Text(stringResource(R.string.yes_finish))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showConfirmDialog = false }) {
+                TextButton(onClick = { viewModel.hideConfirmDialog() }) {
                     Text(stringResource(R.string.continue_capturing))
                 }
             }
@@ -238,8 +163,8 @@ fun ImageCaptureScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = {
-                        if (capturedImages.isNotEmpty()) {
-                            showConfirmDialog = true
+                        if (uiState.capturedImages.isNotEmpty()) {
+                            viewModel.showConfirmDialog()
                         } else {
                             onNavigateBack()
                         }
@@ -290,16 +215,17 @@ fun ImageCaptureScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             // Show selected image, latest image, or placeholder
+                            val selectedImage = uiState.selectedImage
                             if (selectedImage != null) {
                                 AsyncImage(
-                                    model = selectedImage!!.uri,
+                                    model = selectedImage.uri,
                                     contentDescription = "Selected image",
                                     modifier = Modifier.fillMaxSize(),
                                     contentScale = ContentScale.Crop
                                 )
-                            } else if (capturedImages.isNotEmpty()) {
+                            } else if (uiState.capturedImages.isNotEmpty()) {
                                 AsyncImage(
-                                    model = capturedImages.last().uri,
+                                    model = uiState.capturedImages.last().uri,
                                     contentDescription = "Latest captured image",
                                     modifier = Modifier.fillMaxSize(),
                                     contentScale = ContentScale.Crop
@@ -333,13 +259,13 @@ fun ImageCaptureScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         // Captured Images Horizontal List
-                        if (capturedImages.isNotEmpty()) {
+                        if (uiState.capturedImages.isNotEmpty()) {
                             LazyRow(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 items(
-                                    items = capturedImages,
+                                    items = uiState.capturedImages,
                                     key = { it.uri.toString() }
                                 ) { image ->
                                     Box(
@@ -347,15 +273,14 @@ fun ImageCaptureScreen(
                                             .size(80.dp)
                                             .border(
                                                 1.dp,
-                                                if (selectedImage?.uri == image.uri)
+                                                if (uiState.selectedImage?.uri == image.uri)
                                                     MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
                                                 else MaterialTheme.colorScheme.primary,
                                                 MaterialTheme.shapes.small
                                             )
                                             .clip(MaterialTheme.shapes.small)
                                             .clickable {
-                                                selectedImage =
-                                                    if (selectedImage?.uri == image.uri) null else image
+                                                viewModel.toggleImageSelection(image)
                                             }
                                     ) {
                                         AsyncImage(
@@ -365,7 +290,7 @@ fun ImageCaptureScreen(
                                             contentScale = ContentScale.Crop
                                         )
                                         IconButton(
-                                            onClick = { showDeleteDialog = image },
+                                            onClick = { viewModel.showDeleteDialog(image) },
                                             modifier = Modifier
                                                 .bounceClick()
                                                 .align(Alignment.TopEnd)
@@ -396,7 +321,7 @@ fun ImageCaptureScreen(
                         ) {
                             // Image count on the left
                             Text(
-                                text = stringResource(R.string.images_count, capturedImages.size),
+                                text = stringResource(R.string.images_count, uiState.capturedImages.size),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = Color.White,
                                 modifier = Modifier.align(Alignment.CenterStart)
@@ -405,24 +330,7 @@ fun ImageCaptureScreen(
                             // Center the camera button
                             FloatingActionButton(
                                 onClick = {
-                                    val nextNumber = getNextImageNumber()
-                                    val fileName = "$barcodeNumber-$nextNumber.jpg"
-
-                                    val contentValues = ContentValues().apply {
-                                        put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                                        put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-                                        put(
-                                            MediaStore.MediaColumns.RELATIVE_PATH,
-                                            Environment.DIRECTORY_PICTURES + "/ProductScanner"
-                                        )
-                                    }
-
-                                    tempImageUri = context.contentResolver.insert(
-                                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                                        contentValues
-                                    )
-
-                                    tempImageUri?.let { uri ->
+                                    viewModel.prepareImageCapture(context)?.let { uri ->
                                         cameraLauncher.launch(uri)
                                     }
                                 },
@@ -441,9 +349,9 @@ fun ImageCaptureScreen(
                             }
 
                             // Finish button on the right
-                            if (capturedImages.isNotEmpty()) {
+                            if (uiState.capturedImages.isNotEmpty()) {
                                 Button(
-                                    onClick = { showConfirmDialog = true },
+                                    onClick = { viewModel.showConfirmDialog() },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                         contentColor = MaterialTheme.colorScheme.onSecondaryContainer
@@ -465,7 +373,7 @@ fun ImageCaptureScreen(
 
                 // Success Message Overlay
                 AnimatedVisibility(
-                    visible = showSuccessMessage,
+                    visible = uiState.showSuccessMessage,
                     enter = fadeIn() + slideInVertically(),
                     exit = fadeOut() + slideOutVertically(),
                     modifier = Modifier

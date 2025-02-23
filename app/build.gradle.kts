@@ -59,30 +59,19 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 
-    // ML Kit Barcode Scanning
-    implementation(libs.barcode.scanning)
-
-    // CameraX
-    val cameraxVersion = "1.3.1"
-    implementation(libs.androidx.camera.core)
+    implementation(libs.barcode.scanning)     // ML Kit Barcode Scanning
+    implementation(libs.androidx.camera.core)    // CameraX
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(libs.androidx.camera.extensions)
-
-    // Accompanist permissions for handling runtime permissions
-    implementation(libs.accompanist.permissions)
-
-    // Coroutines
-    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.accompanist.permissions)     // Accompanist permissions for handling runtime permissions
+    implementation(libs.kotlinx.coroutines.android)     // Coroutines
     implementation(libs.kotlinx.coroutines.play.services)
-
-    // Lifecycle
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)     // Lifecycle
     implementation(libs.androidx.lifecycle.runtime.compose)
-
-    // Material Icons Extended
-    implementation(libs.androidx.material.icons.extended)
-
-    implementation (libs.coil.compose.v222)
+    implementation(libs.androidx.material.icons.extended)     // Material Icons Extended
+    implementation (libs.coil.compose.v222)    // Coil for image loading
+    implementation(libs.androidx.lifecycle.viewmodel.compose)     // ViewModel dependency
+    implementation(libs.androidx.lifecycle.runtime.compose)
 }
