@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -56,7 +56,10 @@ fun SettingsScreen(
                 title = { Text(stringResource(R.string.settings)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.back)
+                        )
                     }
                 },
                 actions = {
@@ -153,57 +156,6 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
-
-                    // Date Time
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(stringResource(R.string.include_date_time))
-                        Switch(
-                            checked = format.includeDateTime,
-                            onCheckedChange = {
-                                viewModel.updateImageNamingFormat(format.copy(includeDateTime = it))
-                            }
-                        )
-                    }
-
-                    // Custom Text
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(stringResource(R.string.include_custom_text))
-                        Switch(
-                            checked = format.includeCustomText,
-                            onCheckedChange = {
-                                viewModel.updateImageNamingFormat(format.copy(includeCustomText = it))
-                            }
-                        )
-                    }
-
-                    if (format.includeCustomText) {
-                        OutlinedTextField(
-                            value = format.customText,
-                            onValueChange = {
-                                viewModel.updateImageNamingFormat(format.copy(customText = it))
-                            },
-                            label = { Text(stringResource(R.string.custom_text)) },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    // Separator
-                    OutlinedTextField(
-                        value = format.separator,
-                        onValueChange = {
-                            viewModel.updateImageNamingFormat(format.copy(separator = it))
-                        },
-                        label = { Text(stringResource(R.string.separator)) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
                 }
             }
         }

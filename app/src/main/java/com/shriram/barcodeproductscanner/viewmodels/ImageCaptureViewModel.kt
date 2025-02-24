@@ -8,6 +8,8 @@ import android.os.Environment
 import android.provider.MediaStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.shriram.barcodeproductscanner.data.AppDatabase
+import com.shriram.barcodeproductscanner.data.Product
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,18 +40,29 @@ class ImageCaptureViewModel : ViewModel() {
 
     fun initialize(barcodeNumber: String, context: Context) {
         _uiState.update { it.copy(barcodeNumber = barcodeNumber) }
-        // Load settings when initializing
+        // Load settings and product data
         settingsViewModel.loadSettings(context)
+        settingsViewModel.loadProductData(context, barcodeNumber)
+
+        // Create or update product in database
+        viewModelScope.launch {
+            val product = Product(
+                barcode = barcodeNumber,
+                lastModified = System.currentTimeMillis()
+            )
+            AppDatabase.getDatabase(context).productDao().insertOrUpdateProduct(product)
+        }
     }
 
     fun loadExistingImages(context: Context) {
         viewModelScope.launch {
+            val baseName = settingsViewModel.generateImageName(_uiState.value.barcodeNumber)
             val projection = arrayOf(
                 MediaStore.Images.Media._ID,
                 MediaStore.Images.Media.DISPLAY_NAME
             )
             val selection = "${MediaStore.Images.Media.DISPLAY_NAME} LIKE ?"
-            val selectionArgs = arrayOf("${_uiState.value.barcodeNumber}-%")
+            val selectionArgs = arrayOf("$baseName-%")
             val sortOrder = "${MediaStore.Images.Media.DISPLAY_NAME} ASC"
 
             context.contentResolver.query(
@@ -85,11 +98,13 @@ class ImageCaptureViewModel : ViewModel() {
     }
 
     private fun getNextImageNumber(): Int {
+        val baseName = settingsViewModel.generateImageName(_uiState.value.barcodeNumber)
         return if (_uiState.value.capturedImages.isEmpty()) 1
         else {
             _uiState.value.capturedImages
                 .mapNotNull { image ->
-                    val numberStr = image.fileName.substringAfterLast("-")
+                    val numberStr = image.fileName
+                        .substringAfter("$baseName-")
                         .substringBefore(".")
                     numberStr.toIntOrNull()
                 }
@@ -99,7 +114,8 @@ class ImageCaptureViewModel : ViewModel() {
 
     fun prepareImageCapture(context: Context): Uri? {
         val nextNumber = getNextImageNumber()
-        val fileName = settingsViewModel.generateImageName(_uiState.value.barcodeNumber) + "-$nextNumber.jpg"
+        val baseName = settingsViewModel.generateImageName(_uiState.value.barcodeNumber)
+        val fileName = "$baseName-$nextNumber.jpg"
 
         val contentValues = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
@@ -121,7 +137,8 @@ class ImageCaptureViewModel : ViewModel() {
     fun handleImageCaptureResult(success: Boolean, context: Context) {
         if (success && _uiState.value.tempImageUri != null) {
             val nextNumber = getNextImageNumber()
-            val fileName = settingsViewModel.generateImageName(_uiState.value.barcodeNumber) + "-$nextNumber.jpg"
+            val baseName = settingsViewModel.generateImageName(_uiState.value.barcodeNumber)
+            val fileName = "$baseName-$nextNumber.jpg"
             val newImage = CapturedImage(_uiState.value.tempImageUri!!, fileName)
             
             // First update the capturedImages list
@@ -135,8 +152,8 @@ class ImageCaptureViewModel : ViewModel() {
 
             // Then reload images to ensure we have the correct URIs
             viewModelScope.launch {
-//                delay(500) // Small delay to ensure the file is properly saved
-//                loadExistingImages(context)
+                delay(500) // Small delay to ensure the file is properly saved
+                loadExistingImages(context)
                 
                 delay(2000)
                 _uiState.update { it.copy(showSuccessMessage = false) }
@@ -168,13 +185,29 @@ class ImageCaptureViewModel : ViewModel() {
 
     fun deleteImage(context: Context) {
         val imageToDelete = _uiState.value.showDeleteDialog ?: return
+        
+        // Delete the image file
         context.contentResolver.delete(imageToDelete.uri, null, null)
+        
+        // Update UI state
         _uiState.update { state ->
             state.copy(
                 capturedImages = state.capturedImages.filter { it != imageToDelete },
                 showDeleteDialog = null,
                 selectedImage = if (state.selectedImage == imageToDelete) null else state.selectedImage
             )
+        }
+
+        // Update lastModified in database
+        viewModelScope.launch {
+            val dao = AppDatabase.getDatabase(context).productDao()
+            dao.getProduct(_uiState.value.barcodeNumber).collect { product ->
+                if (product != null) {
+                    dao.insertOrUpdateProduct(
+                        product.copy(lastModified = System.currentTimeMillis())
+                    )
+                }
+            }
         }
     }
 

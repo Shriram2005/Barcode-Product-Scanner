@@ -37,9 +37,5 @@
     <string name="preview">Предпросмотр</string>
     <string name="include_barcode">Включить штрих-код</string>
     <string name="include_product_name">Включить название товара</string>
-    <string name="include_date_time">Включить дату и время</string>
-    <string name="include_custom_text">Включить пользовательский текст</string>
     <string name="product_name">Название товара</string>
-    <string name="custom_text">Пользовательский текст</string>
-    <string name="separator">Разделитель</string>
 </resources> 

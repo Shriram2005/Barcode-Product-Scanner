@@ -37,9 +37,5 @@
     <string name="preview">Preview</string>
     <string name="include_barcode">Include Barcode</string>
     <string name="include_product_name">Include Product Name</string>
-    <string name="include_date_time">Include Date &amp; Time</string>
-    <string name="include_custom_text">Include Custom Text</string>
     <string name="product_name">Product Name</string>
-    <string name="custom_text">Custom Text</string>
-    <string name="separator">Separator</string>
 </resources>

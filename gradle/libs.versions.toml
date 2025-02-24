@@ -1,25 +1,27 @@
 [versions]
 accompanistPermissions = "0.34.0"
-agp = "8.8.1"
+agp = "8.2.2"
 barcodeScanning = "17.3.0"
 cameraxVersion = "1.4.1"
 coilComposeVersion = "2.5.0"
 datastorePreferences = "1.1.2"
-kotlin = "2.0.0"
-coreKtx = "1.15.0"
+kotlin = "1.9.0"
+composeCompiler = "1.5.0"
+coreKtx = "1.12.0"
 junit = "4.13.2"
-junitVersion = "1.2.1"
-espressoCore = "3.6.1"
+junitVersion = "1.1.5"
+espressoCore = "3.5.1"
 kotlinxCoroutinesAndroid = "1.7.3"
 kotlinxCoroutinesPlayServices = "1.7.3"
 kotlinxSerializationJson = "1.6.0"
-lifecycleRuntimeKtx = "2.8.7"
-activityCompose = "1.10.0"
-composeBom = "2024.04.01"
-materialIconsExtended = "1.7.8"
-navigationCompose = "2.8.7"
-navigationRuntimeKtx = "2.8.7"
+lifecycleRuntimeKtx = "2.7.0"
+activityCompose = "1.8.2"
+composeBom = "2024.01.00"
+materialIconsExtended = "1.5.4"
+navigationCompose = "2.7.6"
+navigationRuntimeKtx = "2.7.6"
 roomVersion = "2.6.1"
+ksp = "1.9.0-1.0.13"
 
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanistPermissions" }
@@ -60,5 +62,6 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
-kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 
