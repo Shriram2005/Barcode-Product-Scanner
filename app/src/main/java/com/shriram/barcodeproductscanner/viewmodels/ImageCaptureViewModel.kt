@@ -56,13 +56,18 @@ class ImageCaptureViewModel : ViewModel() {
 
     fun loadExistingImages(context: Context) {
         viewModelScope.launch {
-            val baseName = settingsViewModel.generateImageName(_uiState.value.barcodeNumber)
+            val barcodeNumber = _uiState.value.barcodeNumber
             val projection = arrayOf(
                 MediaStore.Images.Media._ID,
                 MediaStore.Images.Media.DISPLAY_NAME
             )
-            val selection = "${MediaStore.Images.Media.DISPLAY_NAME} LIKE ?"
-            val selectionArgs = arrayOf("$baseName-%")
+            
+            // Search for both the barcode name and barcode-N pattern
+            val selection = "${MediaStore.Images.Media.DISPLAY_NAME} LIKE ? OR ${MediaStore.Images.Media.DISPLAY_NAME} LIKE ?"
+            val selectionArgs = arrayOf(
+                "$barcodeNumber.jpg",  // Exact match for base name
+                "$barcodeNumber-%.jpg" // Pattern match for numbered images
+            )
             val sortOrder = "${MediaStore.Images.Media.DISPLAY_NAME} ASC"
 
             context.contentResolver.query(
@@ -86,8 +91,21 @@ class ImageCaptureViewModel : ViewModel() {
                     )
                     images.add(CapturedImage(contentUri, displayName))
                 }
-                val sortedImages = images.sortedBy { img -> img.fileName }
-                _uiState.update { 
+
+                // Custom sorting to handle base name and numbered names
+                val sortedImages = images.sortedWith(compareBy { img ->
+                    // Extract the number from the filename or use -1 for base name (to sort it first)
+                    if (img.fileName == "$barcodeNumber.jpg") {
+                        -1 // Make the base name file sort first
+                    } else {
+                        val numberStr = img.fileName
+                            .substringAfter("$barcodeNumber-")
+                            .substringBefore(".")
+                        numberStr.toIntOrNull() ?: Int.MAX_VALUE
+                    }
+                })
+
+                _uiState.update {
                     it.copy(
                         capturedImages = sortedImages,
                         shouldLaunchCamera = sortedImages.isEmpty()
@@ -97,25 +115,40 @@ class ImageCaptureViewModel : ViewModel() {
         }
     }
 
-    private fun getNextImageNumber(): Int {
-        val baseName = settingsViewModel.generateImageName(_uiState.value.barcodeNumber)
-        return if (_uiState.value.capturedImages.isEmpty()) 1
-        else {
-            _uiState.value.capturedImages
-                .mapNotNull { image ->
+    private fun getNextImageName(): String {
+        val barcodeNumber = _uiState.value.barcodeNumber
+        val images = _uiState.value.capturedImages
+        
+        // If no images exist, use just the barcode number
+        if (images.isEmpty()) {
+            return "$barcodeNumber.jpg"
+        }
+        
+        // If the first image should be just the barcode but doesn't exist yet
+        val hasBaseNameImage = images.any { it.fileName == "$barcodeNumber.jpg" }
+        if (!hasBaseNameImage) {
+            return "$barcodeNumber.jpg"
+        }
+        
+        // Otherwise, find the highest number and increment
+        val highestNumber = images
+            .mapNotNull { image ->
+                if (image.fileName == "$barcodeNumber.jpg") {
+                    null // Skip the base image
+                } else {
                     val numberStr = image.fileName
-                        .substringAfter("$baseName-")
+                        .substringAfter("$barcodeNumber-")
                         .substringBefore(".")
                     numberStr.toIntOrNull()
                 }
-                .maxOrNull()?.plus(1) ?: 1
-        }
+            }
+            .maxOrNull() ?: 0
+            
+        return "$barcodeNumber-${highestNumber + 1}.jpg"
     }
 
     fun prepareImageCapture(context: Context): Uri? {
-        val nextNumber = getNextImageNumber()
-        val baseName = settingsViewModel.generateImageName(_uiState.value.barcodeNumber)
-        val fileName = "$baseName-$nextNumber.jpg"
+        val fileName = getNextImageName()
 
         val contentValues = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
@@ -136,15 +169,25 @@ class ImageCaptureViewModel : ViewModel() {
 
     fun handleImageCaptureResult(success: Boolean, context: Context) {
         if (success && _uiState.value.tempImageUri != null) {
-            val nextNumber = getNextImageNumber()
-            val baseName = settingsViewModel.generateImageName(_uiState.value.barcodeNumber)
-            val fileName = "$baseName-$nextNumber.jpg"
+            val fileName = getNextImageName()
             val newImage = CapturedImage(_uiState.value.tempImageUri!!, fileName)
             
             // First update the capturedImages list
             _uiState.update { state ->
                 state.copy(
-                    capturedImages = (state.capturedImages + newImage).sortedBy { it.fileName },
+                    capturedImages = (state.capturedImages + newImage).sortedWith(
+                        compareBy { img ->
+                            val barcodeNumber = state.barcodeNumber
+                            if (img.fileName == "$barcodeNumber.jpg") {
+                                -1 // Make the base name file sort first
+                            } else {
+                                val numberStr = img.fileName
+                                    .substringAfter("$barcodeNumber-")
+                                    .substringBefore(".")
+                                numberStr.toIntOrNull() ?: Int.MAX_VALUE
+                            }
+                        }
+                    ),
                     showSuccessMessage = true,
                     tempImageUri = null
                 )
@@ -197,18 +240,91 @@ class ImageCaptureViewModel : ViewModel() {
                 selectedImage = if (state.selectedImage == imageToDelete) null else state.selectedImage
             )
         }
+        
+        // Renumber the images if needed
+        renumberImagesAfterDeletion(context)
 
         // Update lastModified in database
         viewModelScope.launch {
-            val dao = AppDatabase.getDatabase(context).productDao()
-            dao.getProduct(_uiState.value.barcodeNumber).collect { product ->
-                if (product != null) {
-                    dao.insertOrUpdateProduct(
-                        product.copy(lastModified = System.currentTimeMillis())
+            val product = Product(
+                barcode = _uiState.value.barcodeNumber,
+                lastModified = System.currentTimeMillis()
+            )
+            AppDatabase.getDatabase(context).productDao().insertOrUpdateProduct(product)
+        }
+    }
+    
+    private fun renumberImagesAfterDeletion(context: Context) {
+        val images = _uiState.value.capturedImages.toMutableList()
+        val barcodeNumber = _uiState.value.barcodeNumber
+        
+        // If there are no images or only one image (which would be the base name), no need to renumber
+        if (images.size <= 1) return
+        
+        // If we still have the base image (without suffix) then we only need to renumber the others
+        val hasBaseImage = images.any { it.fileName == "$barcodeNumber.jpg" }
+        
+        viewModelScope.launch {
+            // Create a list of properly named images with their current URIs
+            val renamedImages = mutableListOf<Pair<CapturedImage, String>>()
+            
+            if (hasBaseImage) {
+                // Keep the base image as is
+                val baseImage = images.first { it.fileName == "$barcodeNumber.jpg" }
+                images.remove(baseImage)
+                renamedImages.add(Pair(baseImage, baseImage.fileName))
+            }
+            
+            // Rename the rest with sequential numbers
+            images.forEachIndexed { index, image ->
+                val newName = if (index == 0 && !hasBaseImage) {
+                    "$barcodeNumber.jpg"
+                } else {
+                    "$barcodeNumber-${if (hasBaseImage) index else index - 1}.jpg"
+                }
+                renamedImages.add(Pair(image, newName))
+            }
+            
+            // Apply the renames if needed
+            renamedImages.forEach { (image, newName) ->
+                if (image.fileName != newName) {
+                    // Create a new file with the correct name
+                    val contentValues = ContentValues().apply {
+                        put(MediaStore.MediaColumns.DISPLAY_NAME, newName)
+                        put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+                        put(
+                            MediaStore.MediaColumns.RELATIVE_PATH,
+                            Environment.DIRECTORY_PICTURES + "/ProductScanner"
+                        )
+                    }
+                    
+                    // Copy the content from old URI to new URI
+                    val newUri = context.contentResolver.insert(
+                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                        contentValues
                     )
+                    
+                    if (newUri != null) {
+                        context.contentResolver.openInputStream(image.uri)?.use { input ->
+                            context.contentResolver.openOutputStream(newUri)?.use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        
+                        // Delete the old file
+                        context.contentResolver.delete(image.uri, null, null)
+                    }
                 }
             }
+            
+            // Reload images to reflect the changes
+            delay(500)
+            loadExistingImages(context)
         }
+    }
+
+    fun clearShouldLaunchCamera() {
+        _uiState.update { it.copy(shouldLaunchCamera = false) }
     }
 
     fun showConfirmDialog() {
@@ -218,8 +334,4 @@ class ImageCaptureViewModel : ViewModel() {
     fun hideConfirmDialog() {
         _uiState.update { it.copy(showConfirmDialog = false) }
     }
-
-    fun clearShouldLaunchCamera() {
-        _uiState.update { it.copy(shouldLaunchCamera = false) }
-    }
-} 
+}
