@@ -24,6 +24,11 @@
     <string name="finish_capturing">Finish Capturing?</string>
     <string name="finish_capturing_message">You have captured %d images. Do you want to finish?</string>
     <string name="yes_finish">Yes, Finish</string>
+    <string name="enter_product_name">Enter Product Name</string>
+    <string name="finish_title">Finish Capturing?</string>
+    <string name="finish_message">Are you ready to save and finish?</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
     <string name="continue_capturing">Continue Capturing</string>
     <string name="image_saved">Image saved successfully!</string>
     <string name="image_save_failed">Failed to save image: %s</string>
@@ -38,4 +43,5 @@
     <string name="include_barcode">Include Barcode</string>
     <string name="include_product_name">Include Product Name</string>
     <string name="product_name">Product Name</string>
+    <string name="product_name_will_be_requested">You will be asked to enter a product name when saving</string>
 </resources>

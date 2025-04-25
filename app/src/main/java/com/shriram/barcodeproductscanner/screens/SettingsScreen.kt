@@ -102,7 +102,7 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.labelMedium
                     )
                     Text(
-                        text = viewModel.generateImageName("123456789"),
+                        text = viewModel.generatePreviewName("123456789"),
                         style = MaterialTheme.typography.bodyLarge
                     )
                 }
@@ -146,14 +146,13 @@ fun SettingsScreen(
                         )
                     }
 
+                    // Show a preview note if product name is enabled
                     if (format.includeProductName) {
-                        OutlinedTextField(
-                            value = format.productName,
-                            onValueChange = {
-                                viewModel.updateImageNamingFormat(format.copy(productName = it))
-                            },
-                            label = { Text(stringResource(R.string.product_name)) },
-                            modifier = Modifier.fillMaxWidth()
+                        Text(
+                            text = stringResource(R.string.product_name_will_be_requested),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp)
                         )
                     }
                 }

@@ -1,0 +1,6 @@
+{
+    "java.configuration.updateBuildConfiguration": "disabled",
+    "java.import.gradle.wrapper.enabled": false,
+    "java.import.gradle.enabled": false,
+    "java.gradle.buildServer.enabled": "off"
+}

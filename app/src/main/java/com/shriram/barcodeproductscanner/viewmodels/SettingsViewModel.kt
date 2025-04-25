@@ -23,6 +23,7 @@ private val Context.dataStore by preferencesDataStore(name = "settings")
 data class ImageNamingFormat(
     val includeBarcode: Boolean = true,
     val includeProductName: Boolean = false,
+    // We'll keep productName field for storage, but it will be populated during image saving
     val productName: String = ""
 )
 
@@ -111,7 +112,8 @@ class SettingsViewModel : ViewModel() {
         )
     }
 
-    fun generateImageName(barcodeNumber: String): String {
+    // Generate the actual image name including product name if available
+fun generateImageName(barcodeNumber: String, productName: String? = null): String {
         val format = _uiState.value.imagingNamingFormat
         val parts = mutableListOf<String>()
 
@@ -120,16 +122,40 @@ class SettingsViewModel : ViewModel() {
             parts.add(barcodeNumber)
         }
 
-        // Add product name if enabled and not blank
-        if (format.includeProductName && format.productName.isNotBlank()) {
-            parts.add(format.productName)
+        // Add product name if enabled and provided (or from format if available)
+        val nameToUse = productName ?: format.productName
+        if (format.includeProductName && nameToUse.isNotBlank()) {
+            parts.add(nameToUse)
         }
 
-        // If no parts are added (both disabled or product name is blank), use a default name
+        // If no parts are added (both disabled or product name is blank), use barcode as default
         // If only product name is enabled but blank, use barcode as fallback
         return when {
             parts.isEmpty() -> barcodeNumber
-            format.includeProductName && !format.includeBarcode && format.productName.isNotBlank() -> format.productName
+            format.includeProductName && !format.includeBarcode && nameToUse.isNotBlank() -> nameToUse
+            else -> parts.joinToString("-")
+        }
+    }
+    
+    // For preview purposes in settings screen - uses a sample product name
+    fun generatePreviewName(barcodeNumber: String): String {
+        val format = _uiState.value.imagingNamingFormat
+        val parts = mutableListOf<String>()
+
+        // Add barcode if enabled
+        if (format.includeBarcode) {
+            parts.add(barcodeNumber)
+        }
+
+        // Add dummy product name if enabled
+        if (format.includeProductName) {
+            parts.add("Product Name")
+        }
+
+        // If nothing is selected, default to barcode
+        return when {
+            parts.isEmpty() -> barcodeNumber
+            format.includeProductName && !format.includeBarcode -> "Product Name"
             else -> parts.joinToString("-")
         }
     }

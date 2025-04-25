@@ -27,6 +27,10 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
@@ -38,6 +42,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -126,22 +131,55 @@ fun ImageCaptureScreen(
         )
     }
 
-    if (uiState.showConfirmDialog) {
+    if (uiState.showProductNameDialog) {
+        var productNameInput by remember { mutableStateOf(uiState.productName) }
+        
         AlertDialog(
-            onDismissRequest = { viewModel.hideConfirmDialog() },
-            title = { Text(stringResource(R.string.finish_capturing)) },
-            text = { Text(stringResource(R.string.finish_capturing_message, uiState.capturedImages.size)) },
+            onDismissRequest = { viewModel.hideProductNameDialog() },
+            title = { Text(stringResource(R.string.enter_product_name)) },
+            text = {
+                OutlinedTextField(
+                    value = productNameInput,
+                    onValueChange = { productNameInput = it },
+                    label = { Text(stringResource(R.string.product_name)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
             confirmButton = {
-                Button(onClick = {
-                    viewModel.hideConfirmDialog()
-                    onNavigateBack()
-                }) {
-                    Text(stringResource(R.string.yes_finish))
+                TextButton(
+                    onClick = { viewModel.submitProductName(productNameInput, context) }
+                ) {
+                    Text(stringResource(R.string.save))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.hideConfirmDialog() }) {
-                    Text(stringResource(R.string.continue_capturing))
+                TextButton(
+                    onClick = { viewModel.hideProductNameDialog() }
+                ) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
+    if (uiState.showConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.hideConfirmDialog() },
+            title = { Text(stringResource(R.string.finish_title)) },
+            text = { Text(stringResource(R.string.finish_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = { onNavigateBack() }
+                ) {
+                    Text(stringResource(R.string.yes))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.hideConfirmDialog() }
+                ) {
+                    Text(stringResource(R.string.no))
                 }
             }
         )

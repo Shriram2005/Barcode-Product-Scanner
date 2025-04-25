@@ -31,13 +31,18 @@ data class ImageCaptureUiState(
     val showDeleteDialog: CapturedImage? = null,
     val tempImageUri: Uri? = null,
     val shouldLaunchCamera: Boolean = false,
-    val hasExistingImages: Boolean = false
+    val hasExistingImages: Boolean = false,
+    val showProductNameDialog: Boolean = false,
+    val productName: String = ""
 )
 
 class ImageCaptureViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(ImageCaptureUiState())
     val uiState: StateFlow<ImageCaptureUiState> = _uiState.asStateFlow()
     private val settingsViewModel: SettingsViewModel = SettingsViewModel()
+    
+    // Flag to track if we're prompting for product name
+    private var shouldPromptForProductName = false
 
     fun initialize(barcodeNumber: String, context: Context) {
         _uiState.update { it.copy(barcodeNumber = barcodeNumber) }
@@ -45,13 +50,23 @@ class ImageCaptureViewModel : ViewModel() {
         settingsViewModel.loadSettings(context)
         settingsViewModel.loadProductData(context, barcodeNumber)
 
-        // Create or update product in database
+        // Load existing product name if available
         viewModelScope.launch {
+            val database = AppDatabase.getDatabase(context)
+            database.productDao().getProduct(barcodeNumber).collect { product ->
+                if (product != null) {
+                    _uiState.update { it.copy(productName = product.productName) }
+                }
+            }
+            
+            // Create or update product in database with timestamp
             val product = Product(
                 barcode = barcodeNumber,
-                lastModified = System.currentTimeMillis()
+                lastModified = System.currentTimeMillis(),
+                // Keep existing product name if any
+                productName = _uiState.value.productName
             )
-            AppDatabase.getDatabase(context).productDao().insertOrUpdateProduct(product)
+            database.productDao().insertOrUpdateProduct(product)
         }
         
         // Check for existing images immediately
@@ -156,37 +171,50 @@ class ImageCaptureViewModel : ViewModel() {
 
     private fun getNextImageName(): String {
         val barcodeNumber = _uiState.value.barcodeNumber
+        val productName = _uiState.value.productName
         val images = _uiState.value.capturedImages
         
-        // If no images exist, use just the barcode number
-        if (images.isEmpty()) {
-            return "$barcodeNumber.jpg"
+        // Generate base name using settings
+        val baseName = if (settingsViewModel.uiState.value.imagingNamingFormat.includeProductName && productName.isNotBlank()) {
+            settingsViewModel.generateImageName(barcodeNumber, productName)
+        } else {
+            // If product name setting is off or no product name provided, just use barcode
+            barcodeNumber
         }
         
-        // If the first image should be just the barcode but doesn't exist yet
-        val hasBaseNameImage = images.any { it.fileName == "$barcodeNumber.jpg" }
+        // If no images exist, use just the base name
+        if (images.isEmpty()) {
+            return "$baseName.jpg"
+        }
+        
+        // Check if base image exists (without number suffix)
+        val baseNamePattern = "$baseName.jpg"
+        val hasBaseNameImage = images.any { it.fileName == baseNamePattern }
         if (!hasBaseNameImage) {
-            return "$barcodeNumber.jpg"
+            return baseNamePattern
         }
         
         // Otherwise, find the highest number and increment
         val highestNumber = images
             .mapNotNull { image ->
-                if (image.fileName == "$barcodeNumber.jpg") {
+                if (image.fileName == baseNamePattern) {
                     null // Skip the base image
-                } else {
+                } else if (image.fileName.startsWith("$baseName-") && image.fileName.endsWith(".jpg")) {
                     val numberStr = image.fileName
-                        .substringAfter("$barcodeNumber-")
+                        .substringAfter("$baseName-")
                         .substringBefore(".")
                     numberStr.toIntOrNull()
+                } else {
+                    null // Different naming pattern, skip
                 }
             }
             .maxOrNull() ?: 0
             
-        return "$barcodeNumber-${highestNumber + 1}.jpg"
+        return "$baseName-${highestNumber + 1}.jpg"
     }
 
     fun prepareImageCapture(context: Context): Uri? {
+        // Get the next image name based on the format
         val fileName = getNextImageName()
 
         val contentValues = ContentValues().apply {
@@ -287,6 +315,7 @@ class ImageCaptureViewModel : ViewModel() {
         viewModelScope.launch {
             val product = Product(
                 barcode = _uiState.value.barcodeNumber,
+                productName = _uiState.value.productName,
                 lastModified = System.currentTimeMillis()
             )
             AppDatabase.getDatabase(context).productDao().insertOrUpdateProduct(product)
@@ -295,13 +324,22 @@ class ImageCaptureViewModel : ViewModel() {
     
     private fun renumberImagesAfterDeletion(context: Context) {
         val images = _uiState.value.capturedImages.toMutableList()
-        val barcodeNumber = _uiState.value.barcodeNumber
+        val productName = _uiState.value.productName
+        
+        // Generate base name using settings
+        val baseName = if (settingsViewModel.uiState.value.imagingNamingFormat.includeProductName && productName.isNotBlank()) {
+            settingsViewModel.generateImageName(_uiState.value.barcodeNumber, productName)
+        } else {
+            // If product name setting is off or no product name provided, just use barcode
+            _uiState.value.barcodeNumber
+        }
         
         // If there are no images or only one image (which would be the base name), no need to renumber
         if (images.size <= 1) return
         
         // If we still have the base image (without suffix) then we only need to renumber the others
-        val hasBaseImage = images.any { it.fileName == "$barcodeNumber.jpg" }
+        val baseFileName = "$baseName.jpg"
+        val hasBaseImage = images.any { it.fileName == baseFileName }
         
         viewModelScope.launch {
             // Create a list of properly named images with their current URIs
@@ -309,7 +347,7 @@ class ImageCaptureViewModel : ViewModel() {
             
             if (hasBaseImage) {
                 // Keep the base image as is
-                val baseImage = images.first { it.fileName == "$barcodeNumber.jpg" }
+                val baseImage = images.first { it.fileName == baseFileName }
                 images.remove(baseImage)
                 renamedImages.add(Pair(baseImage, baseImage.fileName))
             }
@@ -317,9 +355,9 @@ class ImageCaptureViewModel : ViewModel() {
             // Rename the rest with sequential numbers
             images.forEachIndexed { index, image ->
                 val newName = if (index == 0 && !hasBaseImage) {
-                    "$barcodeNumber.jpg"
+                    baseFileName
                 } else {
-                    "$barcodeNumber-${if (hasBaseImage) index else index - 1}.jpg"
+                    "$baseName-${if (hasBaseImage) index else index - 1}.jpg"
                 }
                 renamedImages.add(Pair(image, newName))
             }
@@ -367,10 +405,42 @@ class ImageCaptureViewModel : ViewModel() {
     }
 
     fun showConfirmDialog() {
-        _uiState.update { it.copy(showConfirmDialog = true) }
+        // Check if we need to prompt for product name based on settings
+        shouldPromptForProductName = settingsViewModel.uiState.value.imagingNamingFormat.includeProductName
+        
+        if (shouldPromptForProductName) {
+            // Show product name dialog first
+            _uiState.update { it.copy(showProductNameDialog = true) }
+        } else {
+            // Skip directly to confirm dialog
+            _uiState.update { it.copy(showConfirmDialog = true) }
+        }
     }
 
     fun hideConfirmDialog() {
         _uiState.update { it.copy(showConfirmDialog = false) }
+    }
+    
+    fun showProductNameDialog() {
+        _uiState.update { it.copy(showProductNameDialog = true) }
+    }
+    
+    fun hideProductNameDialog() {
+        _uiState.update { it.copy(showProductNameDialog = false) }
+    }
+    
+    fun submitProductName(productName: String, context: Context) {
+        // Update the UI state
+        _uiState.update { it.copy(productName = productName, showProductNameDialog = false, showConfirmDialog = true) }
+        
+        // Save product name to database
+        viewModelScope.launch {
+            val product = Product(
+                barcode = _uiState.value.barcodeNumber,
+                productName = productName,
+                lastModified = System.currentTimeMillis()
+            )
+            AppDatabase.getDatabase(context).productDao().insertOrUpdateProduct(product)
+        }
     }
 }
