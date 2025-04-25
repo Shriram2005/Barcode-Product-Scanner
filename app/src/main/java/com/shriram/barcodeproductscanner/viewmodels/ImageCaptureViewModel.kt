@@ -30,7 +30,8 @@ data class ImageCaptureUiState(
     val showConfirmDialog: Boolean = false,
     val showDeleteDialog: CapturedImage? = null,
     val tempImageUri: Uri? = null,
-    val shouldLaunchCamera: Boolean = false
+    val shouldLaunchCamera: Boolean = false,
+    val hasExistingImages: Boolean = false
 )
 
 class ImageCaptureViewModel : ViewModel() {
@@ -51,6 +52,39 @@ class ImageCaptureViewModel : ViewModel() {
                 lastModified = System.currentTimeMillis()
             )
             AppDatabase.getDatabase(context).productDao().insertOrUpdateProduct(product)
+        }
+        
+        // Check for existing images immediately
+        checkForExistingImages(context, barcodeNumber)
+    }
+    
+    private fun checkForExistingImages(context: Context, barcodeNumber: String) {
+        viewModelScope.launch {
+            val projection = arrayOf(
+                MediaStore.Images.Media._ID,
+                MediaStore.Images.Media.DISPLAY_NAME
+            )
+            
+            // Search for both the barcode name and barcode-N pattern
+            val selection = "${MediaStore.Images.Media.DISPLAY_NAME} LIKE ? OR ${MediaStore.Images.Media.DISPLAY_NAME} LIKE ?"
+            val selectionArgs = arrayOf(
+                "$barcodeNumber.jpg",  // Exact match for base name
+                "$barcodeNumber-%.jpg" // Pattern match for numbered images
+            )
+            
+            context.contentResolver.query(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                selection,
+                selectionArgs,
+                null
+            )?.use { cursor ->
+                val hasImages = cursor.count > 0
+                _uiState.update { it.copy(hasExistingImages = hasImages) }
+                
+                // Close the cursor properly
+                cursor.close()
+            }
         }
     }
 
@@ -91,6 +125,10 @@ class ImageCaptureViewModel : ViewModel() {
                     )
                     images.add(CapturedImage(contentUri, displayName))
                 }
+                
+                // Update hasExistingImages flag
+                val hasImages = images.isNotEmpty()
+                _uiState.update { it.copy(hasExistingImages = hasImages) }
 
                 // Custom sorting to handle base name and numbered names
                 val sortedImages = images.sortedWith(compareBy { img ->
@@ -108,7 +146,8 @@ class ImageCaptureViewModel : ViewModel() {
                 _uiState.update {
                     it.copy(
                         capturedImages = sortedImages,
-                        shouldLaunchCamera = sortedImages.isEmpty()
+                        // Only set shouldLaunchCamera to true if there are no images and we didn't already know about existing images
+                        shouldLaunchCamera = sortedImages.isEmpty() && !it.hasExistingImages
                     )
                 }
             }
