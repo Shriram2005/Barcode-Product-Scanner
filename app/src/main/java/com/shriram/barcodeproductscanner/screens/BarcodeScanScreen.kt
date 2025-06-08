@@ -25,10 +25,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -58,6 +63,9 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import com.shriram.barcodeproductscanner.R
+import com.shriram.barcodeproductscanner.ui.theme.ScannerFrame
+import com.shriram.barcodeproductscanner.ui.theme.ScannerLine
+import com.shriram.barcodeproductscanner.ui.theme.ScannerOverlay
 import java.util.concurrent.Executors
 
 @OptIn(ExperimentalPermissionsApi::class)
@@ -207,17 +215,24 @@ fun BarcodeScanScreen(
         }
 
         // Settings button
-        IconButton(
+        @OptIn(ExperimentalMaterial3Api::class)
+        Card(
             onClick = onSettingsClick,
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(16.dp)
+                .padding(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+            ),
+            shape = CircleShape
         ) {
-            Icon(
-                imageVector = Icons.Default.Settings,
-                contentDescription = stringResource(R.string.settings),
-                tint = Color.White
-            )
+            IconButton(onClick = onSettingsClick) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = stringResource(R.string.settings),
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
         }
 
         // Scanning Overlay
@@ -235,19 +250,79 @@ fun BarcodeScanScreen(
                 val left = (width - scannerWidth) / 2
                 val top = (height - scannerHeight) / 2
 
-                // Draw scanner frame
-                drawRect(
-                    color = Color.White,
-                    topLeft = Offset(left, top),
-                    size = Size(scannerWidth, scannerHeight),
-                    style = Stroke(width = 4f)
+                // Draw scanner frame with rounded corners
+                val cornerLength = 40f
+                val strokeWidth = 4f
+
+                // Top-left corner
+                drawLine(
+                    color = ScannerFrame,
+                    start = Offset(left, top + cornerLength),
+                    end = Offset(left, top),
+                    strokeWidth = strokeWidth,
+                    cap = StrokeCap.Round
+                )
+                drawLine(
+                    color = ScannerFrame,
+                    start = Offset(left, top),
+                    end = Offset(left + cornerLength, top),
+                    strokeWidth = strokeWidth,
+                    cap = StrokeCap.Round
+                )
+
+                // Top-right corner
+                drawLine(
+                    color = ScannerFrame,
+                    start = Offset(left + scannerWidth - cornerLength, top),
+                    end = Offset(left + scannerWidth, top),
+                    strokeWidth = strokeWidth,
+                    cap = StrokeCap.Round
+                )
+                drawLine(
+                    color = ScannerFrame,
+                    start = Offset(left + scannerWidth, top),
+                    end = Offset(left + scannerWidth, top + cornerLength),
+                    strokeWidth = strokeWidth,
+                    cap = StrokeCap.Round
+                )
+
+                // Bottom-left corner
+                drawLine(
+                    color = ScannerFrame,
+                    start = Offset(left, top + scannerHeight - cornerLength),
+                    end = Offset(left, top + scannerHeight),
+                    strokeWidth = strokeWidth,
+                    cap = StrokeCap.Round
+                )
+                drawLine(
+                    color = ScannerFrame,
+                    start = Offset(left, top + scannerHeight),
+                    end = Offset(left + cornerLength, top + scannerHeight),
+                    strokeWidth = strokeWidth,
+                    cap = StrokeCap.Round
+                )
+
+                // Bottom-right corner
+                drawLine(
+                    color = ScannerFrame,
+                    start = Offset(left + scannerWidth - cornerLength, top + scannerHeight),
+                    end = Offset(left + scannerWidth, top + scannerHeight),
+                    strokeWidth = strokeWidth,
+                    cap = StrokeCap.Round
+                )
+                drawLine(
+                    color = ScannerFrame,
+                    start = Offset(left + scannerWidth, top + scannerHeight - cornerLength),
+                    end = Offset(left + scannerWidth, top + scannerHeight),
+                    strokeWidth = strokeWidth,
+                    cap = StrokeCap.Round
                 )
 
                 // Draw scanning line
                 drawLine(
-                    color = Color.White,
-                    start = Offset(left, top + (scannerHeight * scanLineY)),
-                    end = Offset(left + scannerWidth, top + (scannerHeight * scanLineY)),
+                    color = ScannerLine,
+                    start = Offset(left + 20f, top + (scannerHeight * scanLineY)),
+                    end = Offset(left + scannerWidth - 20f, top + (scannerHeight * scanLineY)),
                     strokeWidth = 3f,
                     cap = StrokeCap.Round
                 )
@@ -255,27 +330,37 @@ fun BarcodeScanScreen(
         }
 
         // Top Bar with instructions
-        Column(
+        Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .background(Color.Black.copy(alpha = 0.3f))
-                .padding(top = 42.dp, bottom = 8.dp, start = 8.dp, end = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 16.dp, vertical = 48.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = ScannerOverlay
+            ),
+            shape = RoundedCornerShape(16.dp)
         ) {
-            Text(
-                text = stringResource(R.string.position_barcode),
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = stringResource(R.string.barcode_scanning_tip),
-                color = Color.White.copy(alpha = 0.8f),
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = stringResource(R.string.position_barcode),
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = stringResource(R.string.barcode_scanning_tip),
+                    color = Color.White.copy(alpha = 0.9f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 } 

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,8 +33,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.material.icons.filled.Camera
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -94,6 +97,15 @@ fun ImageCaptureScreen(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
         viewModel.handleImageCaptureResult(success, context)
+    }
+
+    // Gallery launcher for multiple image selection
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            viewModel.handleGalleryImagesSelected(uris, context)
+        }
     }
 
     // Auto-launch camera when there are no images
@@ -339,69 +351,87 @@ fun ImageCaptureScreen(
                         }
 
                         // Camera Controls
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp)
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            // Image count on the left
+                            // Image count
                             Text(
                                 text = stringResource(R.string.images_count, uiState.capturedImages.size),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = Color.White,
-                                modifier = Modifier.align(Alignment.CenterStart)
+                                modifier = Modifier.align(Alignment.CenterHorizontally)
                             )
 
-                            // Center the camera button
-                            FloatingActionButton(
-                                onClick = {
-                                    viewModel.prepareImageCapture(context)?.let { uri ->
-                                        cameraLauncher.launch(uri)
-                                    }
-                                },
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier
-                                    .size(64.dp)
-                                    .align(Alignment.Center)
-                                    .bounceClick()
+                            // Camera and Gallery buttons row
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Camera,
-                                    contentDescription = stringResource(R.string.take_photo),
-                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(36.dp)
-                                )
-                            }
+                                // Gallery button
+                                FloatingActionButton(
+                                    onClick = {
+                                        galleryLauncher.launch("image/*")
+                                    },
+                                    containerColor = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(56.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PhotoLibrary,
+                                        contentDescription = stringResource(R.string.select_from_gallery),
+                                        tint = MaterialTheme.colorScheme.onSecondary,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
 
-                            // Finish button on the right
-                            if (uiState.capturedImages.isNotEmpty()) {
-                                Button(
-                                    onClick = { 
-                                        // Check if we need to prompt for product name
-                                        val includeProductName = viewModel.needsProductName()
-                                        viewModel.showConfirmDialog()
-                                        
-                                        // Only show toast and navigate back if no product name needed
-                                        if (!includeProductName) {
-                                            // Show toast message for saving
-                                            Toast.makeText(context, context.getString(R.string.images_saved), Toast.LENGTH_SHORT).show()
-                                            // Navigate back after saving
-                                            onNavigateBack()
+                                // Camera button (larger, primary)
+                                FloatingActionButton(
+                                    onClick = {
+                                        viewModel.prepareImageCapture(context)?.let { uri ->
+                                            cameraLauncher.launch(uri)
                                         }
                                     },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                                    ),
-                                    modifier = Modifier
-                                        .align(Alignment.CenterEnd)
-                                        .padding(start = 16.dp)
-                                        .bounceClick()
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(72.dp)
                                 ) {
-                                    Text(
-                                        text = stringResource(R.string.save),
-                                        style = MaterialTheme.typography.titleMedium
+                                    Icon(
+                                        imageVector = Icons.Default.Camera,
+                                        contentDescription = stringResource(R.string.take_photo),
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.size(36.dp)
                                     )
+                                }
+
+                                // Finish button (only show when images exist)
+                                if (uiState.capturedImages.isNotEmpty()) {
+                                    FloatingActionButton(
+                                        onClick = {
+                                            // Check if we need to prompt for product name
+                                            val includeProductName = viewModel.needsProductName()
+                                            viewModel.showConfirmDialog()
+
+                                            // Only show toast and navigate back if no product name needed
+                                            if (!includeProductName) {
+                                                // Show toast message for saving
+                                                Toast.makeText(context, context.getString(R.string.images_saved), Toast.LENGTH_SHORT).show()
+                                                // Navigate back after saving
+                                                onNavigateBack()
+                                            }
+                                        },
+                                        containerColor = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(56.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = stringResource(R.string.save),
+                                            tint = MaterialTheme.colorScheme.onTertiary,
+                                            modifier = Modifier.size(28.dp)
+                                        )
+                                    }
+                                } else {
+                                    // Placeholder to maintain spacing
+                                    Spacer(modifier = Modifier.size(56.dp))
                                 }
                             }
                         }

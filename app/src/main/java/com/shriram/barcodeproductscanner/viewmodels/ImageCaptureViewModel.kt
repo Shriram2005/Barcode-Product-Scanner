@@ -145,15 +145,7 @@ class ImageCaptureViewModel : ViewModel() {
             val possibleBaseNames = mutableListOf<String>()
             
             // First, what name format are we using currently?
-            val currentBaseName = if (settingsViewModel.uiState.value.imagingNamingFormat.includeProductName && productName.isNotBlank()) {
-                if (settingsViewModel.uiState.value.imagingNamingFormat.includeBarcode) {
-                    "$barcodeNumber-$productName" // Both enabled
-                } else {
-                    productName // Only product name
-                }
-            } else {
-                barcodeNumber // Default to barcode
-            }
+            // Note: currentBaseName logic moved to possibleBaseNames generation below
             
             // Add all possible naming patterns we might have used
             possibleBaseNames.add(barcodeNumber) // Always include barcode
@@ -306,7 +298,7 @@ class ImageCaptureViewModel : ViewModel() {
         if (success && _uiState.value.tempImageUri != null) {
             val fileName = getNextImageName()
             val newImage = CapturedImage(_uiState.value.tempImageUri!!, fileName)
-            
+
             // First update the capturedImages list
             _uiState.update { state ->
                 state.copy(
@@ -332,7 +324,7 @@ class ImageCaptureViewModel : ViewModel() {
             viewModelScope.launch {
                 delay(500) // Small delay to ensure the file is properly saved
                 loadExistingImages(context)
-                
+
                 delay(2000)
                 _uiState.update { it.copy(showSuccessMessage = false) }
             }
@@ -342,6 +334,69 @@ class ImageCaptureViewModel : ViewModel() {
                 context.contentResolver.delete(uri, null, null)
             }
             _uiState.update { it.copy(tempImageUri = null) }
+        }
+    }
+
+    fun handleGalleryImagesSelected(uris: List<Uri>, context: Context) {
+        if (uris.isEmpty()) return
+
+        viewModelScope.launch {
+            val newImages = mutableListOf<CapturedImage>()
+
+            try {
+                uris.forEach { sourceUri ->
+                    // Generate a unique filename for each selected image
+                    val fileName = getNextImageName()
+
+                    // Create content values for the new image
+                    val contentValues = ContentValues().apply {
+                        put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                        put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+                        put(
+                            MediaStore.MediaColumns.RELATIVE_PATH,
+                            Environment.DIRECTORY_PICTURES + "/ProductScanner"
+                        )
+                    }
+
+                    // Insert the new image into MediaStore
+                    val newUri = context.contentResolver.insert(
+                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                        contentValues
+                    )
+
+                    if (newUri != null) {
+                        // Copy the image content from gallery to our app folder
+                        context.contentResolver.openInputStream(sourceUri)?.use { input ->
+                            context.contentResolver.openOutputStream(newUri)?.use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+
+                        // Add to our list
+                        newImages.add(CapturedImage(newUri, fileName))
+
+                        // Update the captured images list after each image to get correct next name
+                        _uiState.update { state ->
+                            state.copy(capturedImages = state.capturedImages + CapturedImage(newUri, fileName))
+                        }
+                    }
+                }
+
+                // Show success message
+                _uiState.update { it.copy(showSuccessMessage = true) }
+
+                // Reload images to ensure proper sorting and URIs
+                delay(500)
+                loadExistingImages(context)
+
+                // Hide success message after delay
+                delay(2000)
+                _uiState.update { it.copy(showSuccessMessage = false) }
+
+            } catch (e: Exception) {
+                // Handle error - could show error message to user
+                // For now, just ensure we don't crash
+            }
         }
     }
 
@@ -510,7 +565,7 @@ class ImageCaptureViewModel : ViewModel() {
     fun submitProductName(productName: String, context: Context) {
         // Update the UI state
         _uiState.update { it.copy(productName = productName, showProductNameDialog = false) }
-        
+
         // Save product name to database
         viewModelScope.launch {
             val product = Product(
@@ -519,9 +574,107 @@ class ImageCaptureViewModel : ViewModel() {
                 lastModified = System.currentTimeMillis()
             )
             AppDatabase.getDatabase(context).productDao().insertOrUpdateProduct(product)
+
+            // Rename existing images to include the product name
+            renameExistingImagesWithProductName(context, productName)
         }
-        
+
         // Finish and return without showing confirmation dialog
         finishAndSaveImages()
+    }
+
+    private suspend fun renameExistingImagesWithProductName(context: Context, productName: String) {
+        val currentImages = _uiState.value.capturedImages.toList()
+        if (currentImages.isEmpty()) return
+
+        val barcodeNumber = _uiState.value.barcodeNumber
+
+        // Generate new base name with product name included
+        val newBaseName = settingsViewModel.generateImageName(barcodeNumber, productName)
+
+        // Create a list to store renamed images
+        val renamedImages = mutableListOf<CapturedImage>()
+
+        try {
+            currentImages.forEachIndexed { _, image ->
+                val currentFileName = image.fileName
+
+                // Determine the new file name based on the current naming pattern
+                val newFileName = when {
+                    // If it's the base image (just barcode.jpg)
+                    currentFileName == "$barcodeNumber.jpg" -> {
+                        if (settingsViewModel.uiState.value.imagingNamingFormat.includeBarcode) {
+                            "$newBaseName.jpg"
+                        } else {
+                            // Only product name enabled
+                            "$productName.jpg"
+                        }
+                    }
+                    // If it's a numbered image (barcode-1.jpg, barcode-2.jpg, etc.)
+                    currentFileName.startsWith("$barcodeNumber-") && currentFileName.endsWith(".jpg") -> {
+                        val numberPart = currentFileName.substringAfter("$barcodeNumber-").substringBefore(".jpg")
+                        if (settingsViewModel.uiState.value.imagingNamingFormat.includeBarcode) {
+                            "$newBaseName-$numberPart.jpg"
+                        } else {
+                            // Only product name enabled
+                            "$productName-$numberPart.jpg"
+                        }
+                    }
+                    // If it already has the correct naming, keep it
+                    else -> currentFileName
+                }
+
+                // Only rename if the name actually changes
+                if (newFileName != currentFileName) {
+                    // Create new file with correct name
+                    val contentValues = ContentValues().apply {
+                        put(MediaStore.MediaColumns.DISPLAY_NAME, newFileName)
+                        put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+                        put(
+                            MediaStore.MediaColumns.RELATIVE_PATH,
+                            Environment.DIRECTORY_PICTURES + "/ProductScanner"
+                        )
+                    }
+
+                    // Insert new file
+                    val newUri = context.contentResolver.insert(
+                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                        contentValues
+                    )
+
+                    if (newUri != null) {
+                        // Copy content from old file to new file
+                        context.contentResolver.openInputStream(image.uri)?.use { input ->
+                            context.contentResolver.openOutputStream(newUri)?.use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+
+                        // Delete the old file
+                        context.contentResolver.delete(image.uri, null, null)
+
+                        // Add renamed image to list
+                        renamedImages.add(CapturedImage(newUri, newFileName))
+                    } else {
+                        // If renaming failed, keep the original
+                        renamedImages.add(image)
+                    }
+                } else {
+                    // No rename needed, keep original
+                    renamedImages.add(image)
+                }
+            }
+
+            // Update the UI state with renamed images
+            _uiState.update { it.copy(capturedImages = renamedImages) }
+
+            // Reload images to ensure we have the correct URIs and file names
+            delay(500)
+            loadExistingImages(context)
+
+        } catch (e: Exception) {
+            // If renaming fails, just keep the original images
+            // The product name is still saved to the database
+        }
     }
 }

@@ -16,4 +16,19 @@ interface ProductDao {
 
     @Query("SELECT * FROM products ORDER BY lastModified DESC")
     fun getAllProducts(): Flow<List<Product>>
-} 
+
+    @Query("SELECT * FROM products ORDER BY lastModified DESC LIMIT :limit")
+    suspend fun getRecentProducts(limit: Int): List<Product>
+
+    @Query("SELECT COUNT(*) FROM products")
+    suspend fun getProductCount(): Int
+
+    @Query("SELECT * FROM products WHERE barcode LIKE '%' || :query || '%' OR productName LIKE '%' || :query || '%' ORDER BY lastModified DESC")
+    suspend fun searchProducts(query: String): List<Product>
+
+    @Query("DELETE FROM products WHERE barcode = :barcode")
+    suspend fun deleteProduct(barcode: String)
+
+    @Query("DELETE FROM products")
+    suspend fun deleteAllProducts()
+}

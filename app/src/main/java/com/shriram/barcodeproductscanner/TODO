@@ -4,3 +4,9 @@ add file permission to reed the previous files that are saved in the device
 
 add a see all products option
     in that list, add a delete product option
+
+
+when user scans a previous product code, and save it again with different name, its name should be updated
+
+after capturing images, when i am clicking on save image, its saving the image but not redirecting to scan page. & when i am clicking on save for second time then its working.
+it is only happening when the include product name settings is on.
