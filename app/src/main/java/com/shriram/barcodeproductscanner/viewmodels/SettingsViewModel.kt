@@ -117,23 +117,34 @@ fun generateImageName(barcodeNumber: String, productName: String? = null): Strin
         val format = _uiState.value.imagingNamingFormat
         val parts = mutableListOf<String>()
 
-        // Add barcode only if it's enabled
+        // Get the product name to use (provided or from stored format)
+        val nameToUse = productName ?: format.productName
+
+        // CASE 1: Only product name is enabled (no barcode)
+        if (format.includeProductName && !format.includeBarcode && nameToUse.isNotBlank()) {
+            return nameToUse
+        }
+        
+        // CASE 2: Only barcode is enabled (no product name)
+        if (format.includeBarcode && !format.includeProductName) {
+            return barcodeNumber
+        }
+        
+        // CASE 3: Both are enabled
         if (format.includeBarcode) {
             parts.add(barcodeNumber)
         }
-
-        // Add product name if enabled and provided (or from format if available)
-        val nameToUse = productName ?: format.productName
+        
         if (format.includeProductName && nameToUse.isNotBlank()) {
             parts.add(nameToUse)
         }
-
-        // If no parts are added (both disabled or product name is blank), use barcode as default
-        // If only product name is enabled but blank, use barcode as fallback
-        return when {
-            parts.isEmpty() -> barcodeNumber
-            format.includeProductName && !format.includeBarcode && nameToUse.isNotBlank() -> nameToUse
-            else -> parts.joinToString("-")
+        
+        // CASE 4: No options enabled or product name is blank when only product name is enabled
+        return if (parts.isEmpty()) {
+            // Default to barcode as fallback
+            barcodeNumber
+        } else {
+            parts.joinToString("-")
         }
     }
     

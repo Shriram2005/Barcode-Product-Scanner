@@ -148,7 +148,13 @@ fun ImageCaptureScreen(
             },
             confirmButton = {
                 TextButton(
-                    onClick = { viewModel.submitProductName(productNameInput, context) }
+                    onClick = { 
+                        viewModel.submitProductName(productNameInput, context)
+                        // Show toast message for saving
+                        Toast.makeText(context, context.getString(R.string.images_saved), Toast.LENGTH_SHORT).show()
+                        // Navigate back after saving
+                        onNavigateBack()
+                    }
                 ) {
                     Text(stringResource(R.string.save))
                 }
@@ -158,28 +164,6 @@ fun ImageCaptureScreen(
                     onClick = { viewModel.hideProductNameDialog() }
                 ) {
                     Text(stringResource(R.string.cancel))
-                }
-            }
-        )
-    }
-
-    if (uiState.showConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = { viewModel.hideConfirmDialog() },
-            title = { Text(stringResource(R.string.finish_title)) },
-            text = { Text(stringResource(R.string.finish_message)) },
-            confirmButton = {
-                TextButton(
-                    onClick = { onNavigateBack() }
-                ) {
-                    Text(stringResource(R.string.yes))
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { viewModel.hideConfirmDialog() }
-                ) {
-                    Text(stringResource(R.string.no))
                 }
             }
         )
@@ -392,7 +376,19 @@ fun ImageCaptureScreen(
                             // Finish button on the right
                             if (uiState.capturedImages.isNotEmpty()) {
                                 Button(
-                                    onClick = { viewModel.showConfirmDialog() },
+                                    onClick = { 
+                                        // Check if we need to prompt for product name
+                                        val includeProductName = viewModel.needsProductName()
+                                        viewModel.showConfirmDialog()
+                                        
+                                        // Only show toast and navigate back if no product name needed
+                                        if (!includeProductName) {
+                                            // Show toast message for saving
+                                            Toast.makeText(context, context.getString(R.string.images_saved), Toast.LENGTH_SHORT).show()
+                                            // Navigate back after saving
+                                            onNavigateBack()
+                                        }
+                                    },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                         contentColor = MaterialTheme.colorScheme.onSecondaryContainer
@@ -403,7 +399,7 @@ fun ImageCaptureScreen(
                                         .bounceClick()
                                 ) {
                                     Text(
-                                        text = stringResource(R.string.finish),
+                                        text = stringResource(R.string.save),
                                         style = MaterialTheme.typography.titleMedium
                                     )
                                 }

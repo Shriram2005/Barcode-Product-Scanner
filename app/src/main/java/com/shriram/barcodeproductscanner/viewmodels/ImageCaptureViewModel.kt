@@ -75,23 +75,56 @@ class ImageCaptureViewModel : ViewModel() {
     
     private fun checkForExistingImages(context: Context, barcodeNumber: String) {
         viewModelScope.launch {
+            // First, check if we need to get the product name from the database
+            val database = AppDatabase.getDatabase(context)
+            var productName = ""
+            
+            // Load the product info first to get the name if it exists
+            database.productDao().getProduct(barcodeNumber).collect { product ->
+                if (product != null && product.productName.isNotBlank()) {
+                    productName = product.productName
+                    _uiState.update { it.copy(productName = productName) }
+                }
+            }
+            
+            // Generate the potential base names based on settings
+            val possibleBaseNames = mutableListOf<String>()
+            
+            // Always include barcode as a possible name
+            possibleBaseNames.add(barcodeNumber)
+            
+            // If we have a product name and settings include it
+            if (productName.isNotBlank() && settingsViewModel.uiState.value.imagingNamingFormat.includeProductName) {
+                if (settingsViewModel.uiState.value.imagingNamingFormat.includeBarcode) {
+                    // Both enabled: "barcode-productname"
+                    possibleBaseNames.add("$barcodeNumber-$productName")
+                } else {
+                    // Only product name: "productname"
+                    possibleBaseNames.add(productName)
+                }
+            }
+            
+            // Build the query to search for all possible naming patterns
+            val selectionBuilder = StringBuilder()
+            val selectionArgs = mutableListOf<String>()
+            
+            possibleBaseNames.forEachIndexed { index, baseName ->
+                if (index > 0) selectionBuilder.append(" OR ")
+                selectionBuilder.append("${MediaStore.Images.Media.DISPLAY_NAME} LIKE ? OR ${MediaStore.Images.Media.DISPLAY_NAME} LIKE ?")
+                selectionArgs.add("$baseName.jpg") // Exact match
+                selectionArgs.add("$baseName-%.jpg") // With number suffix
+            }
+            
             val projection = arrayOf(
                 MediaStore.Images.Media._ID,
                 MediaStore.Images.Media.DISPLAY_NAME
             )
             
-            // Search for both the barcode name and barcode-N pattern
-            val selection = "${MediaStore.Images.Media.DISPLAY_NAME} LIKE ? OR ${MediaStore.Images.Media.DISPLAY_NAME} LIKE ?"
-            val selectionArgs = arrayOf(
-                "$barcodeNumber.jpg",  // Exact match for base name
-                "$barcodeNumber-%.jpg" // Pattern match for numbered images
-            )
-            
             context.contentResolver.query(
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
                 projection,
-                selection,
-                selectionArgs,
+                selectionBuilder.toString(),
+                selectionArgs.toTypedArray(),
                 null
             )?.use { cursor ->
                 val hasImages = cursor.count > 0
@@ -106,24 +139,51 @@ class ImageCaptureViewModel : ViewModel() {
     fun loadExistingImages(context: Context) {
         viewModelScope.launch {
             val barcodeNumber = _uiState.value.barcodeNumber
+            val productName = _uiState.value.productName
+            
+            // Generate the potential base names based on settings
+            val possibleBaseNames = mutableListOf<String>()
+            
+            // First, what name format are we using currently?
+            val currentBaseName = if (settingsViewModel.uiState.value.imagingNamingFormat.includeProductName && productName.isNotBlank()) {
+                if (settingsViewModel.uiState.value.imagingNamingFormat.includeBarcode) {
+                    "$barcodeNumber-$productName" // Both enabled
+                } else {
+                    productName // Only product name
+                }
+            } else {
+                barcodeNumber // Default to barcode
+            }
+            
+            // Add all possible naming patterns we might have used
+            possibleBaseNames.add(barcodeNumber) // Always include barcode
+            if (productName.isNotBlank()) {
+                possibleBaseNames.add(productName) // Just product name
+                possibleBaseNames.add("$barcodeNumber-$productName") // Combined
+            }
+            
+            // Build the query to search for all possible naming patterns
+            val selectionBuilder = StringBuilder()
+            val selectionArgs = mutableListOf<String>()
+            
+            possibleBaseNames.forEachIndexed { index, baseName ->
+                if (index > 0) selectionBuilder.append(" OR ")
+                selectionBuilder.append("${MediaStore.Images.Media.DISPLAY_NAME} LIKE ? OR ${MediaStore.Images.Media.DISPLAY_NAME} LIKE ?")
+                selectionArgs.add("$baseName.jpg") // Exact match
+                selectionArgs.add("$baseName-%.jpg") // With number suffix
+            }
+            
             val projection = arrayOf(
                 MediaStore.Images.Media._ID,
                 MediaStore.Images.Media.DISPLAY_NAME
-            )
-            
-            // Search for both the barcode name and barcode-N pattern
-            val selection = "${MediaStore.Images.Media.DISPLAY_NAME} LIKE ? OR ${MediaStore.Images.Media.DISPLAY_NAME} LIKE ?"
-            val selectionArgs = arrayOf(
-                "$barcodeNumber.jpg",  // Exact match for base name
-                "$barcodeNumber-%.jpg" // Pattern match for numbered images
             )
             val sortOrder = "${MediaStore.Images.Media.DISPLAY_NAME} ASC"
 
             context.contentResolver.query(
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
                 projection,
-                selection,
-                selectionArgs,
+                selectionBuilder.toString(),
+                selectionArgs.toTypedArray(),
                 sortOrder
             )?.use { cursor ->
                 val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
@@ -174,12 +234,20 @@ class ImageCaptureViewModel : ViewModel() {
         val productName = _uiState.value.productName
         val images = _uiState.value.capturedImages
         
+        // Get the current settings
+        val includeBarcode = settingsViewModel.uiState.value.imagingNamingFormat.includeBarcode
+        val includeProductName = settingsViewModel.uiState.value.imagingNamingFormat.includeProductName
+        
         // Generate base name using settings
-        val baseName = if (settingsViewModel.uiState.value.imagingNamingFormat.includeProductName && productName.isNotBlank()) {
-            settingsViewModel.generateImageName(barcodeNumber, productName)
-        } else {
-            // If product name setting is off or no product name provided, just use barcode
-            barcodeNumber
+        val baseName = when {
+            // Case 1: Only product name is enabled and we have a product name
+            includeProductName && !includeBarcode && productName.isNotBlank() -> {
+                productName // Use only product name
+            }
+            // Case 2: Both enabled or only barcode enabled
+            else -> {
+                settingsViewModel.generateImageName(barcodeNumber, productName)
+            }
         }
         
         // If no images exist, use just the base name
@@ -404,17 +472,27 @@ class ImageCaptureViewModel : ViewModel() {
         _uiState.update { it.copy(shouldLaunchCamera = false) }
     }
 
+    // Checks if a product name is needed based on settings
+    fun needsProductName(): Boolean {
+        return settingsViewModel.uiState.value.imagingNamingFormat.includeProductName
+    }
+    
     fun showConfirmDialog() {
         // Check if we need to prompt for product name based on settings
-        shouldPromptForProductName = settingsViewModel.uiState.value.imagingNamingFormat.includeProductName
+        shouldPromptForProductName = needsProductName()
         
         if (shouldPromptForProductName) {
             // Show product name dialog first
             _uiState.update { it.copy(showProductNameDialog = true) }
         } else {
-            // Skip directly to confirm dialog
-            _uiState.update { it.copy(showConfirmDialog = true) }
+            // No dialog, just finish and return
+            finishAndSaveImages()
         }
+    }
+    
+    private fun finishAndSaveImages() {
+        // This method is just for signaling we're done - actual saving happens in handleImageCaptureResult
+        // For future needs, we could add more functionality here
     }
 
     fun hideConfirmDialog() {
@@ -431,7 +509,7 @@ class ImageCaptureViewModel : ViewModel() {
     
     fun submitProductName(productName: String, context: Context) {
         // Update the UI state
-        _uiState.update { it.copy(productName = productName, showProductNameDialog = false, showConfirmDialog = true) }
+        _uiState.update { it.copy(productName = productName, showProductNameDialog = false) }
         
         // Save product name to database
         viewModelScope.launch {
@@ -442,5 +520,8 @@ class ImageCaptureViewModel : ViewModel() {
             )
             AppDatabase.getDatabase(context).productDao().insertOrUpdateProduct(product)
         }
+        
+        // Finish and return without showing confirmation dialog
+        finishAndSaveImages()
     }
 }
