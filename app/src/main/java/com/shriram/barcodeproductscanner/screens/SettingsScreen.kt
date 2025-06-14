@@ -13,15 +13,26 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Preview
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -118,102 +129,10 @@ fun SettingsScreen(
                             )
                         }
                         Text(
-                            text = "${viewModel.generatePreviewName("123456789")}.jpg",
+                            text = "123456789.jpg",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-
-            // Format options
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Barcode Switch
-                    SettingsToggleItem(
-                        title = stringResource(R.string.include_barcode),
-                        description = stringResource(R.string.include_barcode_description),
-                        icon = Icons.Default.QrCode,
-                        checked = format.includeBarcode,
-                        onCheckedChange = {
-                            viewModel.updateImageNamingFormat(format.copy(includeBarcode = it))
-                        }
-                    )
-
-                    Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-
-                    // Product Name Switch
-                    SettingsToggleItem(
-                        title = stringResource(R.string.include_product_name),
-                        description = stringResource(R.string.include_product_name_description),
-                        icon = Icons.Default.Tag,
-                        checked = format.includeProductName,
-                        onCheckedChange = {
-                            viewModel.updateImageNamingFormat(format.copy(includeProductName = it))
-                        }
-                    )
-
-                    // Show a preview note if product name is enabled
-                    if (format.includeProductName) {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Text(
-                                    text = stringResource(R.string.product_name_will_be_requested),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Additional Settings Section
-            SettingsSection(
-                title = stringResource(R.string.app_preferences),
-                description = stringResource(R.string.general_app_settings)
-            ) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        SettingsActionItem(
-                            title = stringResource(R.string.app_version),
-                            description = "1.0.0",
-                            icon = Icons.Default.Info,
-                            onClick = { /* Show version info */ }
                         )
                     }
                 }

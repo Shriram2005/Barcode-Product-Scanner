@@ -23,7 +23,7 @@ interface ProductDao {
     @Query("SELECT COUNT(*) FROM products")
     suspend fun getProductCount(): Int
 
-    @Query("SELECT * FROM products WHERE barcode LIKE '%' || :query || '%' OR productName LIKE '%' || :query || '%' ORDER BY lastModified DESC")
+    @Query("SELECT * FROM products WHERE barcode LIKE '%' || :query || '%' ORDER BY lastModified DESC")
     suspend fun searchProducts(query: String): List<Product>
 
     @Query("DELETE FROM products WHERE barcode = :barcode")

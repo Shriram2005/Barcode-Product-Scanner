@@ -7,6 +7,5 @@ import androidx.room.PrimaryKey
 data class Product(
     @PrimaryKey
     val barcode: String,
-    val productName: String = "",
     val lastModified: Long = System.currentTimeMillis()
-) 
+)

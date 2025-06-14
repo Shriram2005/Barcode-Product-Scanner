@@ -143,43 +143,7 @@ fun ImageCaptureScreen(
         )
     }
 
-    if (uiState.showProductNameDialog) {
-        var productNameInput by remember { mutableStateOf(uiState.productName) }
-        
-        AlertDialog(
-            onDismissRequest = { viewModel.hideProductNameDialog() },
-            title = { Text(stringResource(R.string.enter_product_name)) },
-            text = {
-                OutlinedTextField(
-                    value = productNameInput,
-                    onValueChange = { productNameInput = it },
-                    label = { Text(stringResource(R.string.product_name)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { 
-                        viewModel.submitProductName(productNameInput, context)
-                        // Show toast message for saving
-                        Toast.makeText(context, context.getString(R.string.images_saved), Toast.LENGTH_SHORT).show()
-                        // Navigate back after saving
-                        onNavigateBack()
-                    }
-                ) {
-                    Text(stringResource(R.string.save))
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { viewModel.hideProductNameDialog() }
-                ) {
-                    Text(stringResource(R.string.cancel))
-                }
-            }
-        )
-    }
+
 
     Scaffold(
         topBar = {
@@ -407,17 +371,11 @@ fun ImageCaptureScreen(
                                 if (uiState.capturedImages.isNotEmpty()) {
                                     FloatingActionButton(
                                         onClick = {
-                                            // Check if we need to prompt for product name
-                                            val includeProductName = viewModel.needsProductName()
                                             viewModel.showConfirmDialog()
-
-                                            // Only show toast and navigate back if no product name needed
-                                            if (!includeProductName) {
-                                                // Show toast message for saving
-                                                Toast.makeText(context, context.getString(R.string.images_saved), Toast.LENGTH_SHORT).show()
-                                                // Navigate back after saving
-                                                onNavigateBack()
-                                            }
+                                            // Show toast message for saving
+                                            Toast.makeText(context, context.getString(R.string.images_saved), Toast.LENGTH_SHORT).show()
+                                            // Navigate back after saving
+                                            onNavigateBack()
                                         },
                                         containerColor = MaterialTheme.colorScheme.tertiary,
                                         modifier = Modifier.size(56.dp)

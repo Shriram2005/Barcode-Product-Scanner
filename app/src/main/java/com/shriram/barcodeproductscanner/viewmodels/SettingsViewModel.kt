@@ -21,15 +21,11 @@ private val Context.dataStore by preferencesDataStore(name = "settings")
 
 @Serializable
 data class ImageNamingFormat(
-    val includeBarcode: Boolean = true,
-    val includeProductName: Boolean = false,
-    // We'll keep productName field for storage, but it will be populated during image saving
-    val productName: String = ""
+    val includeBarcode: Boolean = true
 )
 
 data class SettingsUiState(
-    val imagingNamingFormat: ImageNamingFormat = ImageNamingFormat(),
-    val isEditing: Boolean = false
+    val imagingNamingFormat: ImageNamingFormat = ImageNamingFormat()
 )
 
 class SettingsViewModel : ViewModel() {
@@ -66,13 +62,6 @@ class SettingsViewModel : ViewModel() {
         viewModelScope.launch {
             dao.getProduct(barcode).collect { product ->
                 currentProduct = product
-                if (product != null) {
-                    updateImageNamingFormat(
-                        _uiState.value.imagingNamingFormat.copy(
-                            productName = product.productName
-                        )
-                    )
-                }
             }
         }
     }
@@ -88,7 +77,6 @@ class SettingsViewModel : ViewModel() {
                 // Save product data if we have a current product
                 currentProduct?.let { product ->
                     val updatedProduct = product.copy(
-                        productName = _uiState.value.imagingNamingFormat.productName,
                         lastModified = System.currentTimeMillis()
                     )
                     AppDatabase.getDatabase(context).productDao()
@@ -106,68 +94,15 @@ class SettingsViewModel : ViewModel() {
         )
     }
 
-    fun toggleEditing() {
-        _uiState.value = _uiState.value.copy(
-            isEditing = !_uiState.value.isEditing
-        )
+
+
+    // Generate the actual image name using only barcode
+    fun generateImageName(barcodeNumber: String): String {
+        return barcodeNumber
     }
 
-    // Generate the actual image name including product name if available
-fun generateImageName(barcodeNumber: String, productName: String? = null): String {
-        val format = _uiState.value.imagingNamingFormat
-        val parts = mutableListOf<String>()
-
-        // Get the product name to use (provided or from stored format)
-        val nameToUse = productName ?: format.productName
-
-        // CASE 1: Only product name is enabled (no barcode)
-        if (format.includeProductName && !format.includeBarcode && nameToUse.isNotBlank()) {
-            return nameToUse
-        }
-        
-        // CASE 2: Only barcode is enabled (no product name)
-        if (format.includeBarcode && !format.includeProductName) {
-            return barcodeNumber
-        }
-        
-        // CASE 3: Both are enabled
-        if (format.includeBarcode) {
-            parts.add(barcodeNumber)
-        }
-        
-        if (format.includeProductName && nameToUse.isNotBlank()) {
-            parts.add(nameToUse)
-        }
-        
-        // CASE 4: No options enabled or product name is blank when only product name is enabled
-        return if (parts.isEmpty()) {
-            // Default to barcode as fallback
-            barcodeNumber
-        } else {
-            parts.joinToString("-")
-        }
-    }
-    
-    // For preview purposes in settings screen - uses a sample product name
+    // For preview purposes in settings screen
     fun generatePreviewName(barcodeNumber: String): String {
-        val format = _uiState.value.imagingNamingFormat
-        val parts = mutableListOf<String>()
-
-        // Add barcode if enabled
-        if (format.includeBarcode) {
-            parts.add(barcodeNumber)
-        }
-
-        // Add dummy product name if enabled
-        if (format.includeProductName) {
-            parts.add("Product Name")
-        }
-
-        // If nothing is selected, default to barcode
-        return when {
-            parts.isEmpty() -> barcodeNumber
-            format.includeProductName && !format.includeBarcode -> "Product Name"
-            else -> parts.joinToString("-")
-        }
+        return barcodeNumber
     }
 } 
