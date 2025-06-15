@@ -2,6 +2,11 @@
 <resources>
     <string name="app_name">Сканер штрих-кодов товаров</string>
     
+    <!-- Navigation -->
+    <string name="home">Главная</string>
+    <string name="scan">Сканировать</string>
+    <string name="history">История</string>
+    
     <!-- Barcode Scanner Screen -->
     <string name="camera_permission_required">Требуется разрешение камеры</string>
     <string name="camera_permission_description">Нам нужен доступ к камере для сканирования штрих-кодов</string>
@@ -16,6 +21,7 @@
     <string name="barcode_copied">Штрих-код скопирован в буфер обмена</string>
     <string name="images_count">%d изображений</string>
     <string name="take_photo">Сделать фото</string>
+    <string name="select_from_gallery">Выбрать из Галереи</string>
     <string name="finish">Завершить</string>
     <string name="delete_image">Удалить изображение</string>
     <string name="delete_confirmation">Вы уверены, что хотите удалить это изображение?</string>
@@ -24,8 +30,13 @@
     <string name="finish_capturing">Завершить съемку?</string>
     <string name="finish_capturing_message">Вы сделали %d изображений. Хотите завершить?</string>
     <string name="yes_finish">Да, завершить</string>
+    <string name="finish_title">Завершить съемку?</string>
+    <string name="finish_message">Вы готовы сохранить и завершить?</string>
+    <string name="yes">Да</string>
+    <string name="no">Нет</string>
     <string name="continue_capturing">Продолжить съемку</string>
     <string name="image_saved">Изображение успешно сохранено!</string>
+    <string name="images_saved">Изображения успешно сохранены!</string>
     <string name="image_save_failed">Не удалось сохранить изображение: %s</string>
 
     <!-- Settings Screen -->
@@ -33,9 +44,92 @@
     <string name="back">Назад</string>
     <string name="save">Сохранить</string>
     <string name="settings_saved">Настройки успешно сохранены</string>
+    <string name="app_settings">Настройки приложения</string>
     <string name="image_naming_format">Формат именования изображений</string>
+    <string name="image_naming_description">Настройте, как будут именоваться изображения товаров</string>
     <string name="preview">Предпросмотр</string>
     <string name="include_barcode">Включить штрих-код</string>
-    <string name="include_product_name">Включить название товара</string>
-    <string name="product_name">Название товара</string>
+    <string name="include_barcode_description">Добавить номер штрих-кода в имя файла изображения</string>
+    <string name="barcode_naming">Именование по штрих-коду</string>
+    <string name="barcode_naming_description">Изображения именуются только по номеру штрих-кода</string>
+    <string name="general_app_settings">Общие настройки приложения</string>
+    <string name="app_version">Версия приложения</string>
+
+    <!-- CSV Import Settings -->
+    <string name="csv_import">Импорт CSV</string>
+    <string name="csv_import_description">Импорт сопоставлений товаров из CSV-файла</string>
+    <string name="import_csv_file">Импортировать CSV-файл</string>
+    <string name="csv_file_format">Формат CSV: SKU;EAN</string>
+    <string name="csv_imported">CSV импортирован</string>
+    <string name="csv_mappings_count">Загружено %d сопоставлений товаров</string>
+    <string name="csv_import_success">CSV успешно импортирован!</string>
+    <string name="csv_import_error">Ошибка импорта CSV: %s</string>
+    <string name="no_csv_imported">CSV-файл не импортирован</string>
+    <string name="import_csv_to_enable">Сначала импортируйте CSV-файл, чтобы включить эту опцию</string>
+
+    <!-- Product Code Naming -->
+    <string name="use_product_code">Использовать код товара</string>
+    <string name="use_product_code_description">Именовать изображения с помощью кодов товаров из CSV вместо штрих-кодов</string>
+    <string name="product_code_naming">Именование по коду товара</string>
+    <string name="product_code_naming_description">Изображения именуются с использованием кодов товаров из CSV-файла</string>
+    <string name="product_code_preview">00-00070425.jpg</string>
+    <string name="barcode_preview">8901207062865.jpg</string>
+
+    <!-- Error Messages -->
+    <string name="product_code_not_found">В импортированном CSV-файле не найден код товара для штрих-кода %1$s</string>
+    <string name="csv_required_for_product_codes">Для именования по коду товара требуется CSV-файл с сопоставлениями</string>
+
+    <!-- Home Screen -->
+    <string name="welcome_back">С возвращением</string>
+    <string name="ready_to_scan">Готовы отсканировать товары?</string>
+    <string name="scan_products_subtitle">Сканируйте и организуйте свои товары</string>
+    <string name="total_products">Всего товаров</string>
+    <string name="recent_scans">Недавние сканирования</string>
+    <string name="quick_actions">Быстрые действия</string>
+    <string name="scan_barcode">Сканировать штрих-код</string>
+    <string name="scan_new_product">Сканировать новый товар</string>
+    <string name="search">Поиск</string>
+    <string name="find_products">Найти товары</string>
+    <string name="view_all">Показать все</string>
+    <string name="view_all_scans">Показать все сканирования</string>
+    <string name="app_preferences">Настройки приложения</string>
+    <string name="scanned_barcode">Отсканированный штрих-код</string>
+    <string name="no_products_yet">Пока нет товаров</string>
+    <string name="start_scanning_description">Начните сканировать штрих-коды, чтобы создать коллекцию товаров</string>
+    <string name="start_scanning">Начать сканирование</string>
+
+    <!-- History Screen -->
+    <string name="scan_history">История сканирования</string>
+    <string name="search_results">Результаты поиска</string>
+    <string name="close_search">Закрыть поиск</string>
+    <string name="delete_all">Удалить все</string>
+    <string name="total_products_scanned">Отсканировано %d товаров</string>
+    <string name="scanned_on">Отсканировано %1$s</string>
+    <string name="view_product">Просмотреть товар</string>
+    <string name="delete_product">Удалить товар</string>
+    <string name="delete_product_confirmation">Вы уверены, что хотите удалить \"%s\"?</string>
+    <string name="delete_all_products">Удалить все товары</string>
+    <string name="delete_all_products_confirmation">Вы уверены, что хотите удалить все товары? Это действие нельзя отменить.</string>
+    <string name="no_scan_history">Нет истории сканирования</string>
+    <string name="scan_products_to_see_history">Отсканируйте товары, чтобы увидеть историю здесь</string>
+
+    <!-- Search functionality -->
+    <string name="search_placeholder">Поиск по штрих-коду...</string>
+    <string name="clear_search">Очистить поиск</string>
+    <string name="search_results_count">Найдено %d результатов</string>
+    <string name="no_results_found">Результаты не найдены</string>
+    <string name="try_different_search">Попробуйте другой поисковый запрос для \"%s\"</string>
+
+    <string name="product_code_naming_enabled">Именование по коду товара включено. Изображения будут именоваться с помощью кодов товаров.</string>
+    <string name="barcode_naming_enabled">Именование по штрих-коду включено. Изображения будут именоваться с помощью штрих-кодов.</string>
+
+    <!-- Image Deletion Messages -->
+    <string name="images_deleted">Изображения товара успешно удалены</string>
+    <string name="all_images_deleted">Все изображения товаров успешно удалены</string>
+
+    <string name="history_tab_barcode">Штрих-коды</string>
+    <string name="history_tab_product_code">Коды товаров</string>
+    <string name="no_images_tab">Не найдено изображений в формате %1$s</string>
+    <string name="capture_images_tab">Сделайте несколько изображений в формате %1$s, чтобы увидеть их здесь</string>
+    <string name="more_images">ещё %1$d</string>
 </resources> 

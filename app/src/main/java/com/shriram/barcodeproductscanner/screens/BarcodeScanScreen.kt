@@ -70,6 +70,7 @@ import com.shriram.barcodeproductscanner.ui.theme.ScannerFrame
 import com.shriram.barcodeproductscanner.ui.theme.ScannerLine
 import com.shriram.barcodeproductscanner.ui.theme.ScannerOverlay
 import java.util.concurrent.Executors
+import androidx.compose.ui.zIndex
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -229,7 +230,8 @@ fun BarcodeScanScreen(
                 onClick = onSettingsClick,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = 48.dp, end = 16.dp),
+                    .padding(top = 48.dp, end = 16.dp)
+                    .zIndex(10f),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
                 ),

@@ -19,7 +19,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Preview
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -91,20 +90,15 @@ fun SettingsScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.settings)) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = {
+                        // Save settings before navigating back
+                        viewModel.saveSettings(context)
+                        onNavigateBack()
+                    }) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.back)
                         )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = {
-                        viewModel.saveSettings(context)
-                        onNavigateBack()
-                        Toast.makeText(context, R.string.settings_saved, Toast.LENGTH_SHORT).show()
-                    }) {
-                        Icon(Icons.Default.Save, contentDescription = stringResource(R.string.save))
                     }
                 }
             )
@@ -190,6 +184,8 @@ fun SettingsScreen(
                         onCheckedChange = { enabled ->
                             if (uiState.csvImported) {
                                 viewModel.toggleProductCodeNaming(enabled)
+                                // Save the settings right away
+                                viewModel.saveSettings(context)
                                 // Show toast to inform user about the change
                                 if (enabled) {
                                     Toast.makeText(
