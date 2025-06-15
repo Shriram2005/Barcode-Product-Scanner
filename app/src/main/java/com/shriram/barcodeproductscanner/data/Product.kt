@@ -1,11 +1,12 @@
 package com.shriram.barcodeproductscanner.data
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 
-@Entity(tableName = "products")
+/**
+ * Simple data class to represent a product that has been scanned
+ */
+@Serializable
 data class Product(
-    @PrimaryKey
     val barcode: String,
     val lastModified: Long = System.currentTimeMillis()
 )

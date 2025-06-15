@@ -2,11 +2,23 @@
 
 add file permission to reed the previous files that are saved in the device
 
-add a see all products option
-    in that list, add a delete product option
 
 
-when user scans a previous product code, and save it again with different name, its name should be updated
+add a new functionality in this app, keeping the current functionality, explaination of the functionality is given below:
 
-after capturing images, when i am clicking on save image, its saving the image but not redirecting to scan page. & when i am clicking on save for second time then its working.
-it is only happening when the include product name settings is on.
+1. **Barcode Scanning**: The user scans product barcodes using the device camera (already done)
+2. **Product Matching**: The application compares the scanned barcode with product codes stored in the CSV file,,add a option to import csv file in settings. this will be the structure of csv file: [_SKU_;_EAN_
+00-00070425;8901207062865
+00-00004752;970000004752
+00-00000217;970000003761
+00-00004796;4897723400660].
+3.  while capture,When a match of barcode is found for the product code, name its file with product code.
+4. **Image Storage**: Capture and save product photos with the following naming convention:
+   - First image: `{product-code}.jpg`
+   - Additional images of the same product: `{product-code}-1.jpg`, `{product-code}-2.jpg`, etc.
+   - Store images in the appropriate directory
+5. implement option in settings screen to switch between save barcode as image name and save product code as image name. it should work properly.
+6.  this new implementation should work properly with current implementation
+7. if product code naming is on and no product code is found in the csv file associated to the barcode then display message to user.
+
+make sure that the image naming format toggle in settings work properly and images are named according to it.

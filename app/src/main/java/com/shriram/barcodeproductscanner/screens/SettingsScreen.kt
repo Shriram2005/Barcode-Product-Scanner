@@ -1,10 +1,13 @@
 package com.shriram.barcodeproductscanner.screens
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,8 +17,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Preview
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -25,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -55,7 +63,30 @@ fun SettingsScreen(
         viewModel.loadSettings(context)
     }
 
+    // CSV file picker launcher
+    val csvPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { viewModel.importCsvFile(context, it) }
+    }
+
+    // Show success/error messages
+    LaunchedEffect(uiState.csvImportSuccess) {
+        if (uiState.csvImportSuccess) {
+            Toast.makeText(context, R.string.csv_import_success, Toast.LENGTH_SHORT).show()
+            viewModel.clearCsvImportMessages()
+        }
+    }
+
+    LaunchedEffect(uiState.csvImportError) {
+        uiState.csvImportError?.let { error ->
+            Toast.makeText(context, context.getString(R.string.csv_import_error, error), Toast.LENGTH_LONG).show()
+            viewModel.clearCsvImportMessages()
+        }
+    }
+
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings)) },
@@ -95,45 +126,129 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onBackground
             )
 
+            // CSV Import Section
+            SettingsSection(
+                title = stringResource(R.string.csv_import),
+                description = stringResource(R.string.csv_import_description)
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    SettingsActionItem(
+                        title = stringResource(R.string.import_csv_file),
+                        description = stringResource(R.string.csv_file_format),
+                        icon = Icons.Default.FileUpload,
+                        onClick = { csvPickerLauncher.launch("text/*") }
+                    )
+
+                    if (uiState.csvImported) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.csv_imported),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = stringResource(R.string.csv_mappings_count, uiState.csvMappingCount),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // Image Naming Section
             SettingsSection(
                 title = stringResource(R.string.image_naming_format),
                 description = stringResource(R.string.image_naming_description)
             ) {
-                // Preview of the current format
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    // Product Code Toggle
+                    SettingsToggleItem(
+                        title = stringResource(R.string.use_product_code),
+                        description = if (uiState.csvImported) {
+                            stringResource(R.string.use_product_code_description)
+                        } else {
+                            stringResource(R.string.import_csv_to_enable)
+                        },
+                        icon = Icons.Default.Settings,
+                        checked = format.useProductCode && uiState.csvImported,
+                        onCheckedChange = { enabled ->
+                            if (uiState.csvImported) {
+                                viewModel.toggleProductCodeNaming(enabled)
+                                // Show toast to inform user about the change
+                                if (enabled) {
+                                    Toast.makeText(
+                                        context,
+                                        R.string.product_code_naming_enabled,
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                } else {
+                                    Toast.makeText(
+                                        context,
+                                        R.string.barcode_naming_enabled,
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            } else {
+                                Toast.makeText(context, R.string.csv_required_for_product_codes, Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    )
+
+                    // Preview of the current format
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        )
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Preview,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(20.dp)
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Preview,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = stringResource(R.string.preview),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                             Text(
-                                text = stringResource(R.string.preview),
-                                style = MaterialTheme.typography.labelLarge,
+                                text = if (format.useProductCode && uiState.csvImported) {
+                                    stringResource(R.string.product_code_preview)
+                                } else {
+                                    stringResource(R.string.barcode_preview)
+                                },
+                                style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.Bold
                             )
                         }
-                        Text(
-                            text = "123456789.jpg",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            fontWeight = FontWeight.Bold
-                        )
                     }
                 }
             }

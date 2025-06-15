@@ -55,6 +55,30 @@
     <string name="general_app_settings">General application preferences</string>
     <string name="app_version">App Version</string>
 
+    <!-- CSV Import Settings -->
+    <string name="csv_import">CSV Import</string>
+    <string name="csv_import_description">Import product mappings from CSV file</string>
+    <string name="import_csv_file">Import CSV File</string>
+    <string name="csv_file_format">CSV Format: SKU;EAN</string>
+    <string name="csv_imported">CSV Imported</string>
+    <string name="csv_mappings_count">%d product mappings loaded</string>
+    <string name="csv_import_success">CSV imported successfully!</string>
+    <string name="csv_import_error">CSV import failed: %s</string>
+    <string name="no_csv_imported">No CSV file imported</string>
+    <string name="import_csv_to_enable">Import CSV file first to enable this option</string>
+
+    <!-- Product Code Naming -->
+    <string name="use_product_code">Use Product Code</string>
+    <string name="use_product_code_description">Name images using product codes from CSV instead of barcodes</string>
+    <string name="product_code_naming">Product Code Naming</string>
+    <string name="product_code_naming_description">Images are named using product codes from CSV file</string>
+    <string name="product_code_preview">00-00070425.jpg</string>
+    <string name="barcode_preview">8901207062865.jpg</string>
+
+    <!-- Error Messages -->
+    <string name="product_code_not_found">No product code found for barcode %1$s in the imported CSV file</string>
+    <string name="csv_required_for_product_codes">CSV file with product mappings is required for product code naming</string>
+
     <!-- Home Screen -->
     <string name="welcome_back">Welcome Back</string>
     <string name="ready_to_scan">Ready to scan some products?</string>
@@ -75,15 +99,13 @@
     <string name="start_scanning_description">Start scanning barcodes to build your product collection</string>
     <string name="start_scanning">Start Scanning</string>
 
-
-
     <!-- History Screen -->
     <string name="scan_history">Scan History</string>
     <string name="search_results">Search Results</string>
     <string name="close_search">Close search</string>
     <string name="delete_all">Delete All</string>
     <string name="total_products_scanned">%d products scanned</string>
-    <string name="scanned_on">Scanned on %s</string>
+    <string name="scanned_on">Scanned on %1$s</string>
     <string name="view_product">View product</string>
     <string name="delete_product">Delete Product</string>
     <string name="delete_product_confirmation">Are you sure you want to delete \"%s\"?</string>
@@ -98,4 +120,17 @@
     <string name="search_results_count">%d results found</string>
     <string name="no_results_found">No results found</string>
     <string name="try_different_search">Try a different search term for \"%s\"</string>
+
+    <string name="product_code_naming_enabled">Product code naming enabled. Images will be named using product codes.</string>
+    <string name="barcode_naming_enabled">Barcode naming enabled. Images will be named using barcodes.</string>
+
+    <!-- Image Deletion Messages -->
+    <string name="images_deleted">Images for product deleted successfully</string>
+    <string name="all_images_deleted">All product images deleted successfully</string>
+
+    <string name="history_tab_barcode">Barcodes</string>
+    <string name="history_tab_product_code">Product Codes</string>
+    <string name="no_images_tab">No images found in %1$s format</string>
+    <string name="capture_images_tab">Capture some images in %1$s format to see them here</string>
+    <string name="more_images">+%1$d more</string>
 </resources>

@@ -1,10 +1,11 @@
 package com.shriram.barcodeproductscanner.viewmodels
 
 import android.content.Context
+import android.provider.MediaStore
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.shriram.barcodeproductscanner.data.AppDatabase
-import com.shriram.barcodeproductscanner.data.Product
+import com.shriram.barcodeproductscanner.utils.ImageUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,7 +14,6 @@ import kotlinx.coroutines.launch
 data class HomeUiState(
     val isLoading: Boolean = true,
     val totalProducts: Int = 0,
-    val recentProducts: List<Product> = emptyList(),
     val error: String? = null
 )
 
@@ -26,21 +26,19 @@ class HomeViewModel : ViewModel() {
             try {
                 _uiState.value = _uiState.value.copy(isLoading = true, error = null)
                 
-                val database = AppDatabase.getDatabase(context)
-                val productDao = database.productDao()
+                // Count products in both barcode and product code folders
+                val barcodeProductsMap = ImageUtils.getAllProductImages(context, false)
+                val productCodeProductsMap = ImageUtils.getAllProductImages(context, true)
                 
-                // Get total products count
-                val totalProducts = productDao.getProductCount()
-                
-                // Get recent products (last 10, ordered by lastModified)
-                val recentProducts = productDao.getRecentProducts(10)
+                // Calculate total unique products by combining both maps
+                val totalProducts = (barcodeProductsMap.keys + productCodeProductsMap.keys).size
                 
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    totalProducts = totalProducts,
-                    recentProducts = recentProducts
+                    totalProducts = totalProducts
                 )
             } catch (e: Exception) {
+                Log.e("HomeViewModel", "Error loading data: ${e.message}", e)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = e.message

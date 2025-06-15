@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -41,6 +42,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -56,15 +59,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.shriram.barcodeproductscanner.R
-import com.shriram.barcodeproductscanner.data.Product
+import com.shriram.barcodeproductscanner.viewmodels.HistoryTab
 import com.shriram.barcodeproductscanner.viewmodels.HistoryViewModel
+import com.shriram.barcodeproductscanner.viewmodels.ImageProduct
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -78,7 +84,7 @@ fun HistoryScreen(
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
-    var showDeleteDialog by remember { mutableStateOf<Product?>(null) }
+    var showDeleteDialog by remember { mutableStateOf<ImageProduct?>(null) }
     var showDeleteAllDialog by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
@@ -88,6 +94,7 @@ fun HistoryScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = {
@@ -128,7 +135,12 @@ fun HistoryScreen(
                     }
 
                     // Delete all icon (only show when not searching and has products)
-                    if (!uiState.isSearching && uiState.allProducts.isNotEmpty()) {
+                    val hasProducts = when (uiState.selectedTab) {
+                        HistoryTab.BARCODE -> uiState.barcodeProducts.isNotEmpty()
+                        HistoryTab.PRODUCT_CODE -> uiState.productCodeProducts.isNotEmpty()
+                    }
+                    
+                    if (!uiState.isSearching && hasProducts) {
                         IconButton(
                             onClick = { showDeleteAllDialog = true }
                         ) {
@@ -145,8 +157,24 @@ fun HistoryScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
         ) {
+            // Tab Row for Barcode/Product Code selection
+            TabRow(
+                selectedTabIndex = if (uiState.selectedTab == HistoryTab.BARCODE) 0 else 1,
+                modifier = Modifier.padding(padding)
+            ) {
+                Tab(
+                    selected = uiState.selectedTab == HistoryTab.BARCODE,
+                    onClick = { viewModel.selectTab(HistoryTab.BARCODE) },
+                    text = { Text(stringResource(R.string.history_tab_barcode)) }
+                )
+                Tab(
+                    selected = uiState.selectedTab == HistoryTab.PRODUCT_CODE,
+                    onClick = { viewModel.selectTab(HistoryTab.PRODUCT_CODE) },
+                    text = { Text(stringResource(R.string.history_tab_product_code)) }
+                )
+            }
+            
             // Search Bar (show when searching)
             AnimatedVisibility(
                 visible = uiState.isSearching,
@@ -194,9 +222,9 @@ fun HistoryScreen(
                                 }
 
                                 items(uiState.searchResults) { product ->
-                                    HistoryProductItem(
+                                    ImageProductItem(
                                         product = product,
-                                        onClick = { onNavigateToProduct(product.barcode) },
+                                        onClick = { onNavigateToProduct(product.identifier) },
                                         onDeleteClick = { showDeleteDialog = product },
                                         highlightQuery = uiState.searchQuery
                                     )
@@ -207,12 +235,14 @@ fun HistoryScreen(
                         }
                     }
 
-                    uiState.allProducts.isEmpty() -> {
-                        EmptyHistoryState()
+                    uiState.currentProducts.isEmpty() -> {
+                        // Show empty state based on selected tab
+                        val tabName = if (uiState.selectedTab == HistoryTab.BARCODE) "barcode" else "product code"
+                        EmptyHistoryState(tabName = tabName)
                     }
 
                     else -> {
-                        // Show all products
+                        // Show products from current tab
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(16.dp),
@@ -220,17 +250,20 @@ fun HistoryScreen(
                         ) {
                             item {
                                 Text(
-                                    text = stringResource(R.string.total_products_scanned, uiState.allProducts.size),
+                                    text = stringResource(
+                                        R.string.total_products_scanned, 
+                                        uiState.currentProducts.size
+                                    ),
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
                             }
 
-                            items(uiState.allProducts) { product ->
-                                HistoryProductItem(
+                            items(uiState.currentProducts) { product ->
+                                ImageProductItem(
                                     product = product,
-                                    onClick = { onNavigateToProduct(product.barcode) },
+                                    onClick = { onNavigateToProduct(product.identifier) },
                                     onDeleteClick = { showDeleteDialog = product }
                                 )
                             }
@@ -250,14 +283,18 @@ fun HistoryScreen(
                 Text(
                     stringResource(
                         R.string.delete_product_confirmation,
-                        product.barcode
+                        product.identifier
                     )
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        viewModel.deleteProduct(product.barcode, context)
+                        viewModel.deleteProduct(
+                            product.identifier, 
+                            uiState.selectedTab == HistoryTab.PRODUCT_CODE,
+                            context
+                        )
                         showDeleteDialog = null
                     }
                 ) {
@@ -298,11 +335,11 @@ fun HistoryScreen(
 }
 
 @Composable
-private fun HistoryProductItem(
-    product: Product,
+private fun ImageProductItem(
+    product: ImageProduct,
     onClick: () -> Unit,
     onDeleteClick: () -> Unit,
-    highlightQuery: String = "" // TODO: Implement search term highlighting
+    highlightQuery: String = ""
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -311,83 +348,126 @@ private fun HistoryProductItem(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(16.dp)
         ) {
-            // Product icon
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Inventory,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            // Product details
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = stringResource(R.string.scanned_barcode),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Medium
-                )
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                Text(
-                    text = product.barcode,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                
-                Spacer(modifier = Modifier.height(2.dp))
-                
-                Text(
-                    text = stringResource(R.string.scanned_on, formatDate(product.lastModified)),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            
-            // Action buttons
+            // Product identifier and actions
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onClick,
-                    modifier = Modifier.size(40.dp)
+                // Product icon
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Visibility,
-                        contentDescription = stringResource(R.string.view_product),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
+                        imageVector = Icons.Default.Inventory,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
                 
-                IconButton(
-                    onClick = onDeleteClick,
-                    modifier = Modifier.size(40.dp)
+                Spacer(modifier = Modifier.width(16.dp))
+                
+                // Product details
+                Column(
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = stringResource(R.string.delete_product),
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(20.dp)
+                    Text(
+                        text = if (product.isPrimaryImage) "Barcode" else "Product Code",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Medium
+                    )
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    Text(
+                        text = product.identifier,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    
+                    Spacer(modifier = Modifier.height(2.dp))
+                    
+                    Text(
+                        text = stringResource(R.string.scanned_on, formatDate(product.lastModified)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                // Action buttons
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    IconButton(
+                        onClick = onClick,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Visibility,
+                            contentDescription = stringResource(R.string.view_product),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    
+                    IconButton(
+                        onClick = onDeleteClick,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = stringResource(R.string.delete_product),
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+            
+            // Thumbnail images preview - show up to 3 thumbnails
+            if (product.images.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Take up to 3 images to show as thumbnails
+                    val thumbnails = product.images.take(3)
+                    thumbnails.forEach { uri ->
+                        AsyncImage(
+                            model = uri,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(80.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                        )
+                    }
+                    // Add placeholder spaces if less than 3 images
+                    repeat(3 - thumbnails.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+                
+                // Show image count if there are more than 3
+                if (product.images.size > 3) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = stringResource(R.string.more_images, product.images.size - 3),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.End)
                     )
                 }
             }
@@ -396,7 +476,7 @@ private fun HistoryProductItem(
 }
 
 @Composable
-private fun EmptyHistoryState() {
+private fun EmptyHistoryState(tabName: String = "") {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -415,7 +495,10 @@ private fun EmptyHistoryState() {
             Spacer(modifier = Modifier.height(16.dp))
             
             Text(
-                text = stringResource(R.string.no_scan_history),
+                text = if (tabName.isEmpty()) 
+                    stringResource(R.string.no_scan_history)
+                else 
+                    stringResource(R.string.no_images_tab, tabName),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -423,7 +506,10 @@ private fun EmptyHistoryState() {
             Spacer(modifier = Modifier.height(8.dp))
             
             Text(
-                text = stringResource(R.string.scan_products_to_see_history),
+                text = if (tabName.isEmpty())
+                    stringResource(R.string.scan_products_to_see_history)
+                else
+                    stringResource(R.string.capture_images_tab, tabName),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

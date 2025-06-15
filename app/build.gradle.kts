@@ -82,8 +82,6 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.serialization.json)
 
-    // Room dependencies
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
-    ksp(libs.androidx.room.compiler)
+    // Document picker for CSV import
+    implementation("androidx.activity:activity-compose:1.8.2")
 }

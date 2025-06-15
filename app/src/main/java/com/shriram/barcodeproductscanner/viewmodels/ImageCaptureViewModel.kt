@@ -9,8 +9,9 @@ import android.provider.MediaStore
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.shriram.barcodeproductscanner.data.AppDatabase
 import com.shriram.barcodeproductscanner.data.Product
+import com.shriram.barcodeproductscanner.data.ProductHistoryRepository
+import com.shriram.barcodeproductscanner.utils.ImageUtils
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,7 +34,9 @@ data class ImageCaptureUiState(
     val tempImageUri: Uri? = null,
     val tempImageFileName: String? = null, // Store the filename for consistency
     val shouldLaunchCamera: Boolean = false,
-    val hasExistingImages: Boolean = false
+    val hasExistingImages: Boolean = false,
+    val productCode: String? = null, // Product code from CSV mapping
+    val showProductCodeNotFoundError: Boolean = false // Show error when product code not found
 )
 
 class ImageCaptureViewModel : ViewModel() {
@@ -54,16 +57,33 @@ class ImageCaptureViewModel : ViewModel() {
         settingsViewModel.loadSettings(context)
         settingsViewModel.loadProductData(context, barcodeNumber)
 
-        // Create or update product in database with timestamp
+        // Check for product code mapping
         viewModelScope.launch {
-            val database = AppDatabase.getDatabase(context)
+            // Wait for settings to load
+            delay(300) // Increased delay to ensure settings are properly loaded
+            val productCode = if (settingsViewModel.isProductCodeNamingEnabled() && settingsViewModel.isCsvImported()) {
+                settingsViewModel.getProductCode(barcodeNumber)
+            } else {
+                null
+            }
+
+            _uiState.update { it.copy(productCode = productCode) }
+
+            // Show error if product code naming is enabled but no mapping found
+            if (settingsViewModel.isProductCodeNamingEnabled() && settingsViewModel.isCsvImported() && productCode == null) {
+                _uiState.update { it.copy(showProductCodeNotFoundError = true) }
+            }
+        }
+
+        // Create or update product in history with timestamp
+        viewModelScope.launch {
             val product = Product(
                 barcode = barcodeNumber,
                 lastModified = System.currentTimeMillis()
             )
-            database.productDao().insertOrUpdateProduct(product)
+            ProductHistoryRepository.getInstance(context).insertOrUpdateProduct(product)
         }
-        
+
         // Check for existing images immediately
         checkForExistingImages(context, barcodeNumber)
     }
@@ -73,12 +93,16 @@ class ImageCaptureViewModel : ViewModel() {
             try {
                 Log.d(TAG, "Checking for existing images for barcode: $barcodeNumber")
 
-                // Build the query to search for barcode-based naming patterns in ProductScanner folder
-                val selection = "(${MediaStore.Images.Media.DISPLAY_NAME} LIKE ? OR ${MediaStore.Images.Media.DISPLAY_NAME} LIKE ?) AND ${MediaStore.Images.Media.RELATIVE_PATH} LIKE ?"
+                // Get the current naming pattern and folder
+                val useProductCode = settingsViewModel.isProductCodeNamingEnabled() && _uiState.value.productCode != null
+                val baseName = getCurrentBaseName()
+                val folderPath = ImageUtils.getFolderPath(useProductCode)
+
+                // Build query for the specific folder
+                val selection = "${MediaStore.Images.Media.DISPLAY_NAME} LIKE ? AND ${MediaStore.Images.Media.RELATIVE_PATH} LIKE ?"
                 val selectionArgs = arrayOf(
-                    "$barcodeNumber.jpg", // Exact match
-                    "$barcodeNumber-%.jpg", // With number suffix
-                    "%ProductScanner%" // In ProductScanner folder
+                    "$baseName%.jpg",  // Any images that start with the base name
+                    "%$folderPath%"    // In the appropriate folder
                 )
 
                 val projection = arrayOf(
@@ -95,7 +119,7 @@ class ImageCaptureViewModel : ViewModel() {
                     null
                 )?.use { cursor ->
                     val hasImages = cursor.count > 0
-                    Log.d(TAG, "Found ${cursor.count} existing images")
+                    Log.d(TAG, "Found ${cursor.count} existing images in folder $folderPath with base name $baseName")
                     _uiState.update { it.copy(hasExistingImages = hasImages) }
                 }
             } catch (e: Exception) {
@@ -108,14 +132,17 @@ class ImageCaptureViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val barcodeNumber = _uiState.value.barcodeNumber
-                Log.d(TAG, "Loading existing images for barcode: $barcodeNumber")
+                val useProductCode = settingsViewModel.isProductCodeNamingEnabled() && _uiState.value.productCode != null
+                val baseName = getCurrentBaseName()
+                val folderPath = ImageUtils.getFolderPath(useProductCode)
+                
+                Log.d(TAG, "Loading existing images for barcode: $barcodeNumber, baseName: $baseName, folder: $folderPath")
 
-                // Build the query to search for barcode-based naming patterns in ProductScanner folder
-                val selection = "(${MediaStore.Images.Media.DISPLAY_NAME} LIKE ? OR ${MediaStore.Images.Media.DISPLAY_NAME} LIKE ?) AND ${MediaStore.Images.Media.RELATIVE_PATH} LIKE ?"
+                // Build query for the specific folder
+                val selection = "${MediaStore.Images.Media.DISPLAY_NAME} LIKE ? AND ${MediaStore.Images.Media.RELATIVE_PATH} LIKE ?"
                 val selectionArgs = arrayOf(
-                    "$barcodeNumber.jpg", // Exact match
-                    "$barcodeNumber-%.jpg", // With number suffix
-                    "%ProductScanner%" // In ProductScanner folder
+                    "$baseName%.jpg",  // Any images that start with the base name
+                    "%$folderPath%"    // In the appropriate folder
                 )
 
                 val projection = arrayOf(
@@ -145,24 +172,26 @@ class ImageCaptureViewModel : ViewModel() {
                             id
                         )
                         images.add(CapturedImage(contentUri, displayName))
-                        Log.d(TAG, "Found image: $displayName with URI: $contentUri")
+                        Log.d(TAG, "Found image: $displayName with URI: $contentUri in folder $folderPath")
                     }
 
                     // Update hasExistingImages flag
                     val hasImages = images.isNotEmpty()
-                    Log.d(TAG, "Total images found: ${images.size}")
+                    Log.d(TAG, "Total images found in folder $folderPath: ${images.size}")
                     _uiState.update { it.copy(hasExistingImages = hasImages) }
 
                     // Custom sorting to handle base name and numbered names
                     val sortedImages = images.sortedWith(compareBy { img ->
                         // Extract the number from the filename or use -1 for base name (to sort it first)
-                        if (img.fileName == "$barcodeNumber.jpg") {
-                            -1 // Make the base name file sort first
-                        } else {
-                            val numberStr = img.fileName
-                                .substringAfter("$barcodeNumber-")
-                                .substringBefore(".")
-                            numberStr.toIntOrNull() ?: Int.MAX_VALUE
+                        when {
+                            img.fileName == "$baseName.jpg" -> -1 // Base name files sort first
+                            img.fileName.startsWith("$baseName-") -> {
+                                val numberStr = img.fileName
+                                    .substringAfter("$baseName-")
+                                    .substringBefore(".")
+                                numberStr.toIntOrNull() ?: Int.MAX_VALUE
+                            }
+                            else -> Int.MAX_VALUE
                         }
                     })
 
@@ -180,67 +209,267 @@ class ImageCaptureViewModel : ViewModel() {
         }
     }
 
-    private fun getNextImageName(): String {
-        val barcodeNumber = _uiState.value.barcodeNumber
-        val images = _uiState.value.capturedImages
-
-        // Use barcode as base name
-        val baseName = barcodeNumber
-
-        // If no images exist, use just the base name
-        if (images.isEmpty()) {
-            return "$baseName.jpg"
+    // Helper method to get the current base name (barcode or product code)
+    private fun getCurrentBaseName(): String {
+        val uiState = _uiState.value
+        val result = if (settingsViewModel.isProductCodeNamingEnabled() && uiState.productCode != null) {
+            uiState.productCode
+        } else {
+            uiState.barcodeNumber
         }
+        Log.d(TAG, "Getting base name: $result (useProductCode=${settingsViewModel.isProductCodeNamingEnabled()}, productCode=${uiState.productCode})")
+        return result
+    }
 
-        // Check if base image exists (without number suffix)
+    private fun getNextImageName(context: Context): String {
+        val images = _uiState.value.capturedImages
+        val baseName = getCurrentBaseName()
         val baseNamePattern = "$baseName.jpg"
+        val useProductCode = settingsViewModel.isProductCodeNamingEnabled() && _uiState.value.productCode != null
+        val folderPath = ImageUtils.getFolderPath(useProductCode)
+        
+        Log.d(TAG, "Finding next image name with base: $baseName in folder: $folderPath, capturedImages count: ${images.size}")
+
+        // Check if we have any images in our list
+        if (images.isEmpty()) {
+            // If no images in our list, check MediaStore directly
+            val baseNameExists = checkIfFileExistsInFolder(context, baseNamePattern, folderPath)
+            Log.d(TAG, "No captured images in list. Base name $baseNamePattern exists in MediaStore: $baseNameExists")
+            
+            return if (baseNameExists) {
+                // Base name exists in MediaStore, find the next available number
+                val result = findNextAvailableNumberedFilename(context, baseName, folderPath)
+                Log.d(TAG, "Found next available numbered filename: $result")
+                result
+            } else {
+                // Base name doesn't exist, we can use it
+                Log.d(TAG, "Using base name as is: $baseNamePattern")
+                baseNamePattern
+            }
+        }
+        
+        // Check if base name exists in our captured images list
         val hasBaseNameImage = images.any { it.fileName == baseNamePattern }
-        if (!hasBaseNameImage) {
+        
+        // Also check if it exists in MediaStore in the specific folder
+        val baseNameExistsInMediaStore = checkIfFileExistsInFolder(context, baseNamePattern, folderPath)
+        
+        // If base name doesn't exist anywhere, use it
+        if (!hasBaseNameImage && !baseNameExistsInMediaStore) {
             return baseNamePattern
         }
 
-        // Otherwise, find the highest number and increment
-        val highestNumber = images
+        // Find the highest number currently in use
+        var highestNumber = 0
+        
+        // Check in our captured images list
+        val highestInList = images
             .mapNotNull { image ->
-                if (image.fileName == baseNamePattern) {
-                    null // Skip the base image
-                } else if (image.fileName.startsWith("$baseName-") && image.fileName.endsWith(".jpg")) {
+                if (image.fileName.startsWith("$baseName-") && image.fileName.endsWith(".jpg")) {
                     val numberStr = image.fileName
                         .substringAfter("$baseName-")
                         .substringBefore(".")
                     numberStr.toIntOrNull()
                 } else {
-                    null // Different naming pattern, skip
+                    null
                 }
             }
             .maxOrNull() ?: 0
-
+            
+        highestNumber = highestInList
+            
+        // Also check for files in MediaStore that may not be in our list
+        val projection = arrayOf(MediaStore.Images.Media.DISPLAY_NAME)
+        val selection = "${MediaStore.Images.Media.DISPLAY_NAME} LIKE ? AND ${MediaStore.Images.Media.RELATIVE_PATH} LIKE ?"
+        val selectionArgs = arrayOf(
+            "$baseName-%.jpg",
+            "%$folderPath%"
+        )
+            
+        try {
+            context.contentResolver.query(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                selection,
+                selectionArgs,
+                null
+            )?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    val displayNameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+                    val displayName = cursor.getString(displayNameColumn)
+                    
+                    if (displayName.startsWith("$baseName-") && displayName.endsWith(".jpg")) {
+                        val numberStr = displayName
+                            .substringAfter("$baseName-")
+                            .substringBefore(".")
+                        val number = numberStr.toIntOrNull() ?: continue
+                        
+                        if (number > highestNumber) {
+                            highestNumber = number
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking MediaStore for existing numbered files", e)
+        }
+        
         return "$baseName-${highestNumber + 1}.jpg"
+    }
+    
+    // Helper method to check if a file with the given name already exists in specified folder
+    private fun checkIfFileExistsInFolder(context: Context, fileName: String, folderPath: String): Boolean {
+        val projection = arrayOf(MediaStore.Images.Media._ID)
+        val selection = "${MediaStore.Images.Media.DISPLAY_NAME} = ? AND ${MediaStore.Images.Media.RELATIVE_PATH} LIKE ?"
+        val selectionArgs = arrayOf(
+            fileName,
+            "%$folderPath%"
+        )
+        
+        Log.d(TAG, "Checking if file exists: $fileName in folder $folderPath")
+        
+        try {
+            context.contentResolver.query(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                selection,
+                selectionArgs,
+                null
+            )?.use { cursor ->
+                val exists = cursor.count > 0
+                if (exists) {
+                    Log.d(TAG, "File $fileName already exists in MediaStore in folder $folderPath")
+                } else {
+                    Log.d(TAG, "File $fileName does not exist in MediaStore in folder $folderPath")
+                }
+                return exists
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking if file exists: $fileName in folder $folderPath", e)
+            // If there's an error checking, assume it doesn't exist
+            return false
+        }
+        
+        return false
+    }
+
+    // Helper method to find the next available numbered filename in a specific folder
+    private fun findNextAvailableNumberedFilename(context: Context, baseName: String, folderPath: String): String {
+        var fileNumber = 1
+        var fileName = "$baseName-$fileNumber.jpg"
+        
+        Log.d(TAG, "Finding next available filename starting with $baseName- in folder $folderPath")
+        
+        while (checkIfFileExistsInFolder(context, fileName, folderPath)) {
+            Log.d(TAG, "$fileName exists in folder $folderPath, trying next number")
+            fileNumber++
+            fileName = "$baseName-$fileNumber.jpg"
+            
+            if (fileNumber > 100) {
+                // Safety check to prevent infinite loop
+                Log.w(TAG, "Stopped search after 100 attempts to find unique filename")
+                // Generate a truly unique name using timestamp
+                fileName = "$baseName-${System.currentTimeMillis()}.jpg"
+                break
+            }
+        }
+        
+        Log.d(TAG, "Selected filename: $fileName for folder $folderPath")
+        return fileName
     }
 
     fun prepareImageCapture(context: Context): Uri? {
         try {
             // Get the next image name based on the format
-            val fileName = getNextImageName()
-            Log.d(TAG, "Preparing image capture with filename: $fileName")
+            var fileName = getNextImageName(context)
+            val useProductCode = settingsViewModel.isProductCodeNamingEnabled() && _uiState.value.productCode != null
+            val folderPath = ImageUtils.getFolderPath(useProductCode)
+            
+            Log.d(TAG, "Preparing image capture with filename: $fileName in folder: $folderPath")
 
+            // Check if a file with this name already exists in MediaStore (double check)
+            var fileExists = checkIfFileExistsInFolder(context, fileName, folderPath)
+            var attempts = 0
+            val maxAttempts = 10
+            
+            // If file exists, try with incrementing numbers until we find a unique name
+            while (fileExists && attempts < maxAttempts) {
+                attempts++
+                
+                // Extract base name and number from fileName
+                val baseName = getCurrentBaseName()
+                var fileNumber = 1
+                
+                if (fileName.contains("-")) {
+                    val numberStr = fileName.substringAfter("-").substringBefore(".")
+                    fileNumber = numberStr.toIntOrNull() ?: 1
+                }
+                
+                // Try a new number
+                fileName = if (fileName == "$baseName.jpg") {
+                    "$baseName-1.jpg"
+                } else {
+                    "$baseName-${fileNumber + attempts}.jpg"
+                }
+                
+                Log.d(TAG, "File exists, trying alternative name: $fileName in folder $folderPath")
+                fileExists = checkIfFileExistsInFolder(context, fileName, folderPath)
+            }
+            
+            if (attempts >= maxAttempts) {
+                // Last resort: use timestamp for truly unique name
+                val baseName = getCurrentBaseName()
+                fileName = "$baseName-${System.currentTimeMillis()}.jpg"
+                Log.d(TAG, "Using timestamp-based filename as last resort: $fileName")
+            }
+            
             val contentValues = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                 put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
                 put(
                     MediaStore.MediaColumns.RELATIVE_PATH,
-                    Environment.DIRECTORY_PICTURES + "/ProductScanner"
+                    folderPath
                 )
             }
 
-            val uri = context.contentResolver.insert(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                contentValues
-            )
+            val uri = try {
+                context.contentResolver.insert(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    contentValues
+                )
+            } catch (e: android.database.sqlite.SQLiteConstraintException) {
+                // If we hit a constraint exception, use timestamp for truly unique name
+                Log.e(TAG, "SQLiteConstraintException when creating file: $fileName in folder $folderPath", e)
+                val baseName = getCurrentBaseName()
+                val timestampFileName = "$baseName-${System.currentTimeMillis()}.jpg"
+                Log.d(TAG, "Using timestamp-based filename after error: $timestampFileName")
+                
+                contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, timestampFileName)
+                try {
+                    val newUri = context.contentResolver.insert(
+                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                        contentValues
+                    )
+                    
+                    if (newUri != null) {
+                        // Update the filename to match the timestamp filename
+                        fileName = timestampFileName
+                    }
+                    newUri
+                } catch (e2: Exception) {
+                    Log.e(TAG, "Failed to create file even with timestamp name", e2)
+                    null
+                }
+            }
 
-            Log.d(TAG, "Created temp URI: $uri")
-            _uiState.update { it.copy(tempImageUri = uri, tempImageFileName = fileName) }
-            return uri
+            if (uri != null) {
+                Log.d(TAG, "Created temp URI: $uri in folder $folderPath")
+                _uiState.update { it.copy(tempImageUri = uri, tempImageFileName = fileName) }
+                return uri
+            } else {
+                Log.e(TAG, "Failed to create URI for image capture in folder $folderPath")
+                return null
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error preparing image capture", e)
             return null
@@ -260,17 +489,19 @@ class ImageCaptureViewModel : ViewModel() {
 
                 // First update the capturedImages list
                 _uiState.update { state ->
+                    val baseName = getCurrentBaseName()
                     state.copy(
                         capturedImages = (state.capturedImages + newImage).sortedWith(
                             compareBy { img ->
-                                val barcodeNumber = state.barcodeNumber
-                                if (img.fileName == "$barcodeNumber.jpg") {
-                                    -1 // Make the base name file sort first
-                                } else {
-                                    val numberStr = img.fileName
-                                        .substringAfter("$barcodeNumber-")
-                                        .substringBefore(".")
-                                    numberStr.toIntOrNull() ?: Int.MAX_VALUE
+                                when {
+                                    img.fileName == "$baseName.jpg" -> -1 // Base name files sort first
+                                    img.fileName.startsWith("$baseName-") -> {
+                                        val numberStr = img.fileName
+                                            .substringAfter("$baseName-")
+                                            .substringBefore(".")
+                                        numberStr.toIntOrNull() ?: Int.MAX_VALUE
+                                    }
+                                    else -> Int.MAX_VALUE
                                 }
                             }
                         ),
@@ -321,11 +552,13 @@ class ImageCaptureViewModel : ViewModel() {
 
         viewModelScope.launch {
             val newImages = mutableListOf<CapturedImage>()
+            val useProductCode = settingsViewModel.isProductCodeNamingEnabled() && _uiState.value.productCode != null
+            val folderPath = ImageUtils.getFolderPath(useProductCode)
 
             try {
                 uris.forEach { sourceUri ->
                     // Generate a unique filename for each selected image
-                    val fileName = getNextImageName()
+                    val fileName = getNextImageName(context)
 
                     // Create content values for the new image
                     val contentValues = ContentValues().apply {
@@ -333,7 +566,7 @@ class ImageCaptureViewModel : ViewModel() {
                         put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
                         put(
                             MediaStore.MediaColumns.RELATIVE_PATH,
-                            Environment.DIRECTORY_PICTURES + "/ProductScanner"
+                            folderPath
                         )
                     }
 
@@ -414,25 +647,27 @@ class ImageCaptureViewModel : ViewModel() {
         // Renumber the images if needed
         renumberImagesAfterDeletion(context)
 
-        // Update lastModified in database
+        // Update lastModified in product history
         viewModelScope.launch {
             val product = Product(
                 barcode = _uiState.value.barcodeNumber,
                 lastModified = System.currentTimeMillis()
             )
-            AppDatabase.getDatabase(context).productDao().insertOrUpdateProduct(product)
+            ProductHistoryRepository.getInstance(context).insertOrUpdateProduct(product)
         }
     }
     
     private fun renumberImagesAfterDeletion(context: Context) {
         val images = _uiState.value.capturedImages.toMutableList()
 
-        // Use barcode as base name
-        val baseName = _uiState.value.barcodeNumber
-        
+        // Use current base name (barcode or product code)
+        val baseName = getCurrentBaseName()
+        val useProductCode = settingsViewModel.isProductCodeNamingEnabled() && _uiState.value.productCode != null
+        val folderPath = ImageUtils.getFolderPath(useProductCode)
+
         // If there are no images or only one image (which would be the base name), no need to renumber
         if (images.size <= 1) return
-        
+
         // If we still have the base image (without suffix) then we only need to renumber the others
         val baseFileName = "$baseName.jpg"
         val hasBaseImage = images.any { it.fileName == baseFileName }
@@ -467,7 +702,7 @@ class ImageCaptureViewModel : ViewModel() {
                         put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
                         put(
                             MediaStore.MediaColumns.RELATIVE_PATH,
-                            Environment.DIRECTORY_PICTURES + "/ProductScanner"
+                            folderPath
                         )
                     }
                     
@@ -518,5 +753,9 @@ class ImageCaptureViewModel : ViewModel() {
 
     fun hideConfirmDialog() {
         _uiState.update { it.copy(showConfirmDialog = false) }
+    }
+
+    fun dismissProductCodeNotFoundError() {
+        _uiState.update { it.copy(showProductCodeNotFoundError = false) }
     }
 }
