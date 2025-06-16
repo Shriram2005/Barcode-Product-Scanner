@@ -29,10 +29,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -46,7 +42,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -82,6 +77,7 @@ private fun copyBarcodeToClipboard(context: Context, barcodeNumber: String) {
 @Composable
 fun ImageCaptureScreen(
     barcodeNumber: String,
+    isProductCode: Boolean = false,
     onNavigateBack: () -> Unit,
     viewModel: ImageCaptureViewModel = viewModel()
 ) {
@@ -89,8 +85,11 @@ fun ImageCaptureScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(barcodeNumber) {
-        viewModel.initialize(barcodeNumber, context)
-        viewModel.loadExistingImages(context)
+        // Initialize the view model with the barcode and isProductCode flag
+        viewModel.initialize(barcodeNumber, context, isProductCode)
+        
+        // loadExistingImages is now called inside initialize after product code is properly set up
+        // so we don't need to call it separately here
     }
 
     // Camera launcher
@@ -446,6 +445,7 @@ fun ImageCaptureScreen(
 private fun ImageCaptureScreenPreview() {
     ImageCaptureScreen(
         barcodeNumber = "1234567890",
+        isProductCode = false,
         onNavigateBack = {}
     )
 } 

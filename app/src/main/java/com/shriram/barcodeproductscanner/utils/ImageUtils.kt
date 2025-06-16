@@ -407,4 +407,30 @@ object ImageUtils {
             key.contains(query, ignoreCase = true)
         }
     }
+
+    /**
+     * Get all images for a product from both barcode and product code folders
+     * This is used when we want to display all images regardless of folder
+     */
+    suspend fun getAllProductImagesAcrossFolders(context: Context, barcode: String, productCode: String?): List<Uri> {
+        return withContext(Dispatchers.IO) {
+            val images = mutableListOf<Uri>()
+            
+            try {
+                // Get images from barcode folder
+                images.addAll(getProductImagesFromFolder(context, barcode, false))
+                
+                // If product code is available, also get images from product code folder
+                if (productCode != null) {
+                    images.addAll(getProductImagesFromFolder(context, productCode, true))
+                }
+                
+                Log.d(TAG, "Found ${images.size} total images across folders for barcode: $barcode, productCode: $productCode")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error getting product images across folders", e)
+            }
+            
+            images
+        }
+    }
 }

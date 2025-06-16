@@ -80,6 +80,7 @@ import java.util.Locale
 fun HistoryScreen(
     onNavigateBack: () -> Unit,
     onNavigateToProduct: (String) -> Unit,
+    onNavigateToProductWithCode: (String, Boolean) -> Unit,
     viewModel: HistoryViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -224,7 +225,15 @@ fun HistoryScreen(
                                 items(uiState.searchResults) { product ->
                                     ImageProductItem(
                                         product = product,
-                                        onClick = { onNavigateToProduct(product.identifier) },
+                                        onClick = { 
+                                            if (product.isPrimaryImage) {
+                                                // It's a barcode - pass to regular handler
+                                                onNavigateToProduct(product.identifier)
+                                            } else {
+                                                // It's a product code - pass with flag
+                                                onNavigateToProductWithCode(product.identifier, true)
+                                            }
+                                        },
                                         onDeleteClick = { showDeleteDialog = product },
                                         highlightQuery = uiState.searchQuery
                                     )
@@ -263,7 +272,15 @@ fun HistoryScreen(
                             items(uiState.currentProducts) { product ->
                                 ImageProductItem(
                                     product = product,
-                                    onClick = { onNavigateToProduct(product.identifier) },
+                                    onClick = { 
+                                        if (product.isPrimaryImage) {
+                                            // It's a barcode - pass to regular handler
+                                            onNavigateToProduct(product.identifier)
+                                        } else {
+                                            // It's a product code - pass with flag
+                                            onNavigateToProductWithCode(product.identifier, true)
+                                        }
+                                    },
                                     onDeleteClick = { showDeleteDialog = product }
                                 )
                             }
@@ -389,11 +406,11 @@ private fun ImageProductItem(
                     
                     Spacer(modifier = Modifier.height(4.dp))
                     
-                    Text(
-                        text = product.identifier,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+//                    Text(
+//                        text = product.identifier,
+//                        style = MaterialTheme.typography.bodyMedium,
+//                        color = MaterialTheme.colorScheme.onSurfaceVariant
+//                    )
                     
                     Spacer(modifier = Modifier.height(2.dp))
                     

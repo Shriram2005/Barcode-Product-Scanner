@@ -3,33 +3,44 @@ package com.shriram.barcodeproductscanner.navigation
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.shriram.barcodeproductscanner.R
-import com.shriram.barcodeproductscanner.screens.*
+import com.shriram.barcodeproductscanner.screens.BarcodeScanScreen
+import com.shriram.barcodeproductscanner.screens.HistoryScreen
+import com.shriram.barcodeproductscanner.screens.HomeScreen
+import com.shriram.barcodeproductscanner.screens.ImageCaptureScreen
+import com.shriram.barcodeproductscanner.screens.SettingsScreen
 
 sealed class Screen(val route: String) {
     data object Home : Screen("home")
     data object BarcodeScanner : Screen("barcode_scanner")
     data object History : Screen("history")
     data object Settings : Screen("settings")
-    data object ImageCapture : Screen("image_capture/{barcodeNumber}") {
-        fun createRoute(barcodeNumber: String) = "image_capture/$barcodeNumber"
+    data object ImageCapture : Screen("image_capture/{barcodeNumber}?isProductCode={isProductCode}") {
+        fun createRoute(barcodeNumber: String) = "image_capture/$barcodeNumber?isProductCode=false"
+        fun createRouteWithProductCode(productCode: String, isProductCode: Boolean) = 
+            "image_capture/$productCode?isProductCode=$isProductCode"
     }
 }
 
@@ -127,16 +138,29 @@ fun AppNavigation(
                     },
                     onNavigateToProduct = { barcodeNumber ->
                         navController.navigate(Screen.ImageCapture.createRoute(barcodeNumber))
+                    },
+                    onNavigateToProductWithCode = { code, isProductCode ->
+                        navController.navigate(Screen.ImageCapture.createRouteWithProductCode(code, isProductCode))
                     }
                 )
             }
 
             composable(
-                route = Screen.ImageCapture.route
+                route = Screen.ImageCapture.route,
+                arguments = listOf(
+                    navArgument("barcodeNumber") { type = NavType.StringType },
+                    navArgument("isProductCode") { 
+                        type = NavType.BoolType 
+                        defaultValue = false
+                    }
+                )
             ) { backStackEntry ->
                 val barcodeNumber = backStackEntry.arguments?.getString("barcodeNumber") ?: return@composable
+                val isProductCode = backStackEntry.arguments?.getBoolean("isProductCode") ?: false
+                
                 ImageCaptureScreen(
                     barcodeNumber = barcodeNumber,
+                    isProductCode = isProductCode,
                     onNavigateBack = {
                         navController.popBackStack()
                     }

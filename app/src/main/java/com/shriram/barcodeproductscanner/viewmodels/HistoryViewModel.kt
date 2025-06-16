@@ -8,8 +8,6 @@ import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shriram.barcodeproductscanner.R
-import com.shriram.barcodeproductscanner.data.Product
-import com.shriram.barcodeproductscanner.data.ProductHistoryRepository
 import com.shriram.barcodeproductscanner.utils.ImageUtils
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -68,11 +66,11 @@ class HistoryViewModel : ViewModel() {
                 // Load products from product code folder
                 val productCodeProducts = loadProductsFromFolder(context, true)
                 
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
                     barcodeProducts = barcodeProducts,
                     productCodeProducts = productCodeProducts
-                )
+                    )
             } catch (e: Exception) {
                 Log.e("HistoryViewModel", "Error loading products: ${e.message}", e)
                 _uiState.value = _uiState.value.copy(
@@ -82,7 +80,7 @@ class HistoryViewModel : ViewModel() {
             }
         }
     }
-    
+
     private suspend fun loadProductsFromFolder(context: Context, useProductCode: Boolean): List<ImageProduct> {
         // Get all products with images from the folder
         val productsMap = ImageUtils.getAllProductImages(context, useProductCode)
@@ -122,7 +120,7 @@ class HistoryViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 Log.d("HistoryViewModel", "Starting deletion of images for identifier: $identifier, useProductCode: $useProductCode")
-                
+
                 // Delete images from the appropriate folder
                 val imagesDeleted = ImageUtils.deleteFromMediaStore(context, identifier, 
                     ImageUtils.getFolderPath(useProductCode))
@@ -150,7 +148,7 @@ class HistoryViewModel : ViewModel() {
             try {
                 // Delete all images from both folders
                 val imagesDeleted = ImageUtils.deleteAllProductImages(context)
-                
+
                 if (imagesDeleted) {
                     Toast.makeText(
                         context,
