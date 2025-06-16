@@ -30,6 +30,7 @@ import com.shriram.barcodeproductscanner.screens.BarcodeScanScreen
 import com.shriram.barcodeproductscanner.screens.HistoryScreen
 import com.shriram.barcodeproductscanner.screens.HomeScreen
 import com.shriram.barcodeproductscanner.screens.ImageCaptureScreen
+import com.shriram.barcodeproductscanner.screens.InstructionsScreen
 import com.shriram.barcodeproductscanner.screens.SettingsScreen
 
 sealed class Screen(val route: String) {
@@ -37,6 +38,7 @@ sealed class Screen(val route: String) {
     data object BarcodeScanner : Screen("barcode_scanner")
     data object History : Screen("history")
     data object Settings : Screen("settings")
+    data object Instructions : Screen("instructions")
     data object ImageCapture : Screen("image_capture/{barcodeNumber}?isProductCode={isProductCode}") {
         fun createRoute(barcodeNumber: String) = "image_capture/$barcodeNumber?isProductCode=false"
         fun createRouteWithProductCode(productCode: String, isProductCode: Boolean) = 
@@ -169,6 +171,17 @@ fun AppNavigation(
 
             composable(Screen.Settings.route) {
                 SettingsScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    },
+                    onNavigateToInstructions = {
+                        navController.navigate(Screen.Instructions.route)
+                    }
+                )
+            }
+            
+            composable(Screen.Instructions.route) {
+                InstructionsScreen(
                     onNavigateBack = {
                         navController.popBackStack()
                     }

@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Preview
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
@@ -52,6 +53,7 @@ import com.shriram.barcodeproductscanner.viewmodels.SettingsViewModel
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToInstructions: () -> Unit,
     viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -112,12 +114,13 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // Header
-            Text(
-                text = stringResource(R.string.app_settings),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
+            
+            // Instructions Link
+            SettingsActionItem(
+                title = stringResource(R.string.instructions),
+                description = stringResource(R.string.how_to_use),
+                icon = Icons.Default.Help,
+                onClick = onNavigateToInstructions
             )
 
             // CSV Import Section

@@ -133,4 +133,41 @@
     <string name="no_images_tab">No images found in %1$s format</string>
     <string name="capture_images_tab">Capture some images in %1$s format to see them here</string>
     <string name="more_images">+%1$d more</string>
+    
+    <!-- Instructions Screen -->
+    <string name="instructions">Instructions</string>
+    <string name="how_to_use">How to Use the App</string>
+    <string name="app_introduction">This app helps you scan product barcodes, capture product images, and organize them efficiently. Here\'s how to use the various features:</string>
+    
+    <string name="scanning_barcodes">Scanning Barcodes</string>
+    <string name="scanning_step1">Open the app and tap on the \"Scan\" button in the bottom navigation or on the home screen.</string>
+    <string name="scanning_step2">Position the product barcode within the scanning frame and hold steady.</string>
+    <string name="scanning_step3">Once scanned, you\'ll be taken to the image capture screen automatically.</string>
+    
+    <string name="capturing_images">Capturing Images</string>
+    <string name="capturing_step1">After scanning a barcode, you can capture images of the product.</string>
+    <string name="capturing_step2">Tap the camera button to take a photo, or gallery button to choose existing images.</string>
+    <string name="capturing_step3">You can take multiple images for the same product as needed.</string>
+    <string name="capturing_step4">Tap the check mark button when you\'re done capturing images.</string>
+    
+    <string name="product_codes">Working with Product Codes</string>
+    <string name="product_code_step1">Go to Settings and import a CSV file containing product code mappings.</string>
+    <string name="product_code_step2">The CSV format should be SKU;EAN (product code;barcode).</string>
+    <string name="product_code_step3">Enable \"Use Product Code\" in settings to name images using product codes instead of barcodes.</string>
+    <string name="product_code_step4">When you scan a barcode, the app will look up and use the matching product code if available.</string>
+    
+    <string name="viewing_history">Viewing History</string>
+    <string name="history_step1">Tap the \"History\" tab in the bottom navigation to view your scan history.</string>
+    <string name="history_step2">Switch between \"Barcodes\" and \"Product Codes\" tabs to see images organized by naming format.</string>
+    <string name="history_step3">Tap the view icon to see all images for a product, or delete icon to remove the product.</string>
+    
+    <string name="settings_configuration">Settings Configuration</string>
+    <string name="settings_step1">Access Settings from the home screen or while scanning.</string>
+    <string name="settings_step2">Configure image naming format and import product code mappings as needed.</string>
+    
+    <string name="tips_and_tricks">Tips and Best Practices</string>
+    <string name="tip1">Ensure good lighting when scanning barcodes for better recognition.</string>
+    <string name="tip2">Take multiple angles of each product for better documentation.</string>
+    <string name="tip3">Use product code naming if you want to organize images by SKU instead of barcode numbers.</string>
+    <string name="tip4">You can search your product history using partial barcode or product code numbers.</string>
 </resources>
